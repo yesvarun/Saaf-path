@@ -254,8 +254,9 @@ header.mast{padding:calc(14px + env(safe-area-inset-top)) 18px 10px;border-botto
     <div class="field">
       <label>Engine</label>
       <select id="setModel">
-        <option value="gemini-2.5-flash">Gemini 2.5 Flash — FREE tier, recommended daily</option>
-        <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite — FREE, higher daily limit</option>
+        <option value="gemini-flash-latest">Gemini Flash (auto-latest) — FREE, recommended daily</option>
+        <option value="gemini-3.5-flash">Gemini 3.5 Flash — FREE tier</option>
+        <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite — FREE, higher daily limit</option>
         <option value="claude-haiku-4-5">Claude Haiku 4.5 — paid, ~₹40–70 per bundle</option>
         <option value="claude-sonnet-4-6">Claude Sonnet 4.6 — paid, best quality, ~5×</option>
       </select>
@@ -302,8 +303,12 @@ function show(id){
 var CFG = {
   key: localStorage.getItem('sp_key') || '',
   gkey: localStorage.getItem('sp_gkey') || '',
-  model: localStorage.getItem('sp_model') || 'gemini-2.5-flash'
+  model: localStorage.getItem('sp_model') || 'gemini-flash-latest'
 };
+if(CFG.model.indexOf('gemini-2.') === 0){  // 2.x generation retired by Google mid-2026
+  CFG.model = 'gemini-flash-latest';
+  localStorage.setItem('sp_model', CFG.model);
+}
 function isGemini(){ return CFG.model.indexOf('gemini') === 0; }
 var READER = JSON.parse(localStorage.getItem('sp_reader') || '{}');
 READER = Object.assign({size:19, lh:1.72, font:'serif', just:true, theme:'paper'}, READER);
@@ -349,8 +354,9 @@ function dbDel(id){
 
 /* ---------- pricing (USD per MTok in/out) ---------- */
 var PRICE = {
-  'gemini-2.5-flash':      {i:0, o:0},
-  'gemini-2.5-flash-lite': {i:0, o:0},
+  'gemini-flash-latest':   {i:0, o:0},
+  'gemini-3.5-flash':      {i:0, o:0},
+  'gemini-3.1-flash-lite': {i:0, o:0},
   'claude-haiku-4-5':  {i:1,  o:5},
   'claude-sonnet-4-6': {i:3, o:15}
 };
@@ -449,6 +455,9 @@ function gemini(content, maxTok){
       if(liveGkeys().length) throw {retry:true, immediate:true};
       throw new Error('All Gemini keys rejected — re-check them in Setup');
     }
+    if(r.status === 404){
+      throw new Error('This Gemini model was retired by Google — open Setup and pick "Gemini Flash (auto-latest)"');
+    }
     if(!r.ok) return r.text().then(function(t){ throw new Error('Gemini '+r.status+': '+t.slice(0,180)); });
     return r.json();
   }).then(function(j){
@@ -504,13 +513,13 @@ function pageText(page){
 }
 function pageImage(page){
   var vp1 = page.getViewport({scale:1});
-  var scale = Math.min(2200 / Math.max(vp1.width, vp1.height), 3);
+  var scale = Math.min(1800 / Math.max(vp1.width, vp1.height), 3);
   var vp = page.getViewport({scale: scale});
   var cv = document.createElement('canvas');
   cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
   var ctx = cv.getContext('2d');
   return page.render({canvasContext:ctx, viewport:vp}).promise.then(function(){
-    var dataUrl = cv.toDataURL('image/jpeg', 0.82);
+    var dataUrl = cv.toDataURL('image/jpeg', 0.78);
     cv.width = cv.height = 0;
     return dataUrl.split(',')[1];
   });
@@ -557,6 +566,7 @@ function processPdf(file){
     var queue = [];
     for(var i=1; i<=pdf.numPages; i++) queue.push(i);
     var CONC = isGemini() ? (gkeys().length >= 3 ? 2 : 1) : 2, active = 0, articleCount = 0;
+    var requeued = {};
 
     return new Promise(function(resolve){
       function maybeDone(){
@@ -574,6 +584,7 @@ function processPdf(file){
         if(queue.length === 0){ maybeDone(); return; }
         if(active >= CONC) return;
         var pageNo = queue.shift();
+        var postponed = false;
         active++;
         pdf.getPage(pageNo).then(function(page){
           return pageText(page).then(function(txt){
@@ -613,9 +624,17 @@ function processPdf(file){
             tick('p.' + pageNo + ' — could not parse output, skipped');
           }
         }).catch(function(e){
-          tick('p.' + pageNo + ' ✗ ' + esc(e.message || 'failed'));
+          if(e && e.retry && !requeued[pageNo]){
+            requeued[pageNo] = true;
+            queue.push(pageNo);
+            tick('p.' + pageNo + ' ⏸ still limited — postponed to end of queue');
+            postponed = true;
+          } else {
+            tick('p.' + pageNo + ' ✗ ' + esc(e.message || 'rate limit persisted — try Flash-Lite engine'));
+          }
         }).then(function(){
-          active--; RUN.edition.done++;
+          active--;
+          if(!postponed) RUN.edition.done++;
           paint();
           next(); maybeDone();
         });
