@@ -376,7 +376,7 @@ var EXTRACT_SYS =
 '{"source":"<newspaper name if identifiable, else Unknown>","articles":[{"headline":"","kicker":"","byline":"","body":"","continuationOf":""}]}\n' +
 "Rules:\n" +
 "1. HEADLINE VERBATIM. Copy each headline exactly as printed — same words, same capitalisation. Never rewrite, shorten, or 'improve' it.\n" +
-"2. Include EVERY editorial, op-ed, column, analysis piece, book review, obituary/tribute and archival piece on the page — not a selection. Group all reader letters into ONE article headlined exactly as the section is titled (e.g. Letters to the Editor), separating letters with blank lines and keeping each signature.\n" +
+"2. Include EVERY article on the page, whatever its kind — news reports, editorials, op-eds, columns, analysis, features, interviews, business and sports reports, book reviews, obituaries/tributes and archival pieces. Not a selection. Even short single-paragraph news briefs count: group a briefs column into ONE article headlined as the column is titled. Group all reader letters into ONE article headlined exactly as the section is titled (e.g. Letters to the Editor), separating letters with blank lines and keeping each signature.\n" +
 "3. Skip only non-article furniture: mastheads, ads, crosswords, sudoku, quizzes, weather/forecast tables, calendars, stock tickers, photo captions, page numbers, promo boxes.\n" +
 "4. body = full article text, paragraphs separated by \\n\\n. Reconstruct correct column reading order. Merge words broken by line-end hyphens. Repair missing ligatures common in these PDFs: aected→affected, rst→first, signicant→significant, oer→offer, inuence→influence, ecient→efficient etc. Do not summarise, do not omit paragraphs, do not add anything.\n" +
 "5. kicker = small label above the headline (EDITORIAL, OPINION, PARLEY, EXPLAINER…) if present, else empty. byline = author and role line if present, else empty.\n" +
@@ -411,15 +411,19 @@ function claude(content, maxTok){
     };
   });
 }
-var gkRot = 0, gkLast = 0;
+var gkRot = 0, gkLast = 0, gkDead = {};
 function gkeys(){
   return CFG.gkey.split(',').map(function(k){return k.trim();}).filter(Boolean);
 }
+function liveGkeys(){
+  return gkeys().filter(function(k){ return !gkDead[k]; });
+}
 function gemini(content, maxTok){
-  var keys = gkeys();
+  var keys = liveGkeys();
+  if(!keys.length) return Promise.reject(new Error('No working Gemini key — check Setup'));
   var key = keys[gkRot % keys.length]; gkRot++;
   // proactive pacing: keep a minimum gap between calls, shared across keys
-  var gap = Math.max(0, Math.ceil(6500 / Math.max(keys.length,1)) - (Date.now() - gkLast));
+  var gap = Math.max(0, Math.ceil(6500 / keys.length) - (Date.now() - gkLast));
   return new Promise(function(res){ setTimeout(res, gap); }).then(function(){
     gkLast = Date.now();
     var parts = content.map(function(b){
@@ -439,6 +443,12 @@ function gemini(content, maxTok){
     });
   }).then(function(r){
     if(r.status === 429 || r.status === 503) throw {retry:true, status:r.status};
+    if(r.status === 400 || r.status === 403){
+      gkDead[key] = true;
+      tick('🔑 Key ending …' + key.slice(-4) + ' rejected (' + r.status + ') — dropped from rotation');
+      if(liveGkeys().length) throw {retry:true, immediate:true};
+      throw new Error('All Gemini keys rejected — re-check them in Setup');
+    }
     if(!r.ok) return r.text().then(function(t){ throw new Error('Gemini '+r.status+': '+t.slice(0,180)); });
     return r.json();
   }).then(function(j){
@@ -456,8 +466,8 @@ function claudeWithRetry(content, maxTok, tries){
   tries = tries || 0;
   return callModel(content, maxTok).catch(function(e){
     if(e && e.retry && tries < 5){
-      var wait = (isGemini() ? 5000 : 2500) * Math.pow(1.8, tries);
-      tick('⏳ Rate-limited, waiting ' + Math.round(wait/1000) + 's…');
+      var wait = e.immediate ? 300 : (isGemini() ? 5000 : 2500) * Math.pow(1.8, tries);
+      if(!e.immediate) tick('⏳ Rate-limited, waiting ' + Math.round(wait/1000) + 's…');
       return new Promise(function(res){ setTimeout(res, wait); })
         .then(function(){ return claudeWithRetry(content, maxTok, tries+1); });
     }
