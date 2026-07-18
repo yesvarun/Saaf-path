@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#171512">
+<title>ਸਾਫ਼ ਪਾਠ · Saaf Path — Editorial Reader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Source+Serif+4:opsz,ital,wght@8..60,0,400;8..60,0,600;8..60,1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root{
+  --ink:#171512; --paper:#F7F3E9; --paper-2:#EFE9DA; --rule:#D8D0BC;
+  --press:#9E1B1B; --press-2:#C9403A; --muted:#6E6656;
+  --ui:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --disp:"Fraunces",Georgia,serif;
+  --read:"Source Serif 4",Georgia,"Noto Serif",serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{height:100%}
+body{font-family:var(--ui);background:var(--paper);color:var(--ink);min-height:100%;
+  padding-bottom:env(safe-area-inset-bottom)}
+button{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer}
+input,select{font-family:inherit}
+.hide{display:none!important}
+
+/* ---------- masthead ---------- */
+header.mast{padding:calc(14px + env(safe-area-inset-top)) 18px 10px;border-bottom:3px double var(--ink);
+  display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+.mast h1{font-family:var(--disp);font-weight:700;font-size:26px;letter-spacing:-.01em;line-height:1}
+.mast h1 small{display:block;font-family:var(--ui);font-weight:600;font-size:10px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--press);margin-top:5px}
+.mast .gear{font-size:13px;font-weight:600;color:var(--muted);border:1px solid var(--rule);
+  border-radius:999px;padding:7px 12px;background:#fff8}
+.dateline{padding:7px 18px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+  border-bottom:1px solid var(--rule);display:flex;justify-content:space-between}
+
+/* ---------- library ---------- */
+.wrap{padding:16px 18px 40px;max-width:720px;margin:0 auto}
+.drop{margin-top:6px;border:2px dashed var(--rule);border-radius:14px;background:#fff7;
+  padding:26px 18px;text-align:center}
+.drop .big{font-family:var(--disp);font-weight:600;font-size:19px}
+.drop p{color:var(--muted);font-size:13px;margin-top:6px;line-height:1.5}
+.btn{display:inline-block;background:var(--press);color:#FBF6EA;font-weight:700;font-size:15px;
+  padding:13px 22px;border-radius:999px;margin-top:14px;box-shadow:0 2px 0 #6d1010}
+.btn:active{transform:translateY(1px);box-shadow:none}
+.btn.ghost{background:transparent;color:var(--press);box-shadow:none;border:1.5px solid var(--press)}
+.sec-label{margin:26px 0 8px;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--muted);display:flex;align-items:center;gap:10px}
+.sec-label::after{content:"";flex:1;height:1px;background:var(--rule)}
+.edition{background:#fff9;border:1px solid var(--rule);border-radius:12px;padding:14px 14px 12px;
+  margin-bottom:10px;display:flex;gap:12px;align-items:center}
+.edition .folio{font-family:var(--disp);font-weight:700;font-size:20px;color:var(--press);min-width:44px;
+  text-align:center;border-right:1px solid var(--rule);padding-right:12px;line-height:1.1}
+.edition .folio span{display:block;font-family:var(--ui);font-size:9px;letter-spacing:.15em;color:var(--muted);font-weight:600}
+.edition .meta{flex:1;min-width:0}
+.edition .meta b{font-size:15px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.edition .meta i{font-style:normal;color:var(--muted);font-size:12px}
+.edition .del{color:var(--muted);font-size:18px;padding:8px}
+.empty{color:var(--muted);font-size:13px;padding:8px 2px}
+
+/* ---------- processing ---------- */
+.proc{max-width:720px;margin:0 auto;padding:26px 18px 40px;text-align:center}
+.pressbar{height:14px;border:1.5px solid var(--ink);border-radius:999px;overflow:hidden;background:#fff8;margin:18px 0 8px}
+.pressbar i{display:block;height:100%;width:0%;background:repeating-linear-gradient(45deg,var(--press),var(--press) 8px,var(--press-2) 8px,var(--press-2) 16px);transition:width .4s}
+.proc .stat{font-family:var(--disp);font-weight:600;font-size:20px;margin-top:14px}
+.proc .sub{color:var(--muted);font-size:13px;margin-top:6px;line-height:1.6}
+.ticker{margin-top:18px;text-align:left;background:#fff8;border:1px solid var(--rule);border-radius:12px;
+  padding:12px 14px;font-size:12.5px;color:var(--muted);max-height:180px;overflow:auto;line-height:1.7}
+.ticker b{color:var(--ink)}
+.costline{margin-top:14px;font-size:12px;color:var(--muted)}
+.costline b{color:var(--press)}
+
+/* ---------- article index ---------- */
+.idxhead{padding:12px 18px;border-bottom:1px solid var(--rule);display:flex;gap:10px;align-items:center;
+  position:sticky;top:0;background:var(--paper);z-index:5}
+.idxhead .back{font-size:22px;line-height:1;padding:4px 8px 4px 0}
+.idxhead .t{flex:1;min-width:0}
+.idxhead .t b{display:block;font-family:var(--disp);font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.idxhead .t i{font-style:normal;font-size:11px;color:var(--muted)}
+.search{padding:10px 18px 4px}
+.search input{width:100%;padding:11px 14px;border-radius:999px;border:1px solid var(--rule);
+  background:#fff9;font-size:14px;outline:none}
+.srcgrp{margin-top:18px}
+.srcgrp h3{padding:0 18px;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--press);display:flex;align-items:center;gap:10px}
+.srcgrp h3::after{content:"";flex:1;height:2px;background:var(--ink);opacity:.85}
+.art{display:block;width:100%;text-align:left;padding:13px 18px;border-bottom:1px solid var(--rule)}
+.art .kick{font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--press);margin-bottom:3px}
+.art h4{font-family:var(--disp);font-weight:600;font-size:16.5px;line-height:1.28}
+.art .by{margin-top:4px;font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.art.read h4{color:var(--muted);font-weight:500}
+.art.read .kick{color:var(--muted)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--press);display:inline-block}
+.art.read .dot{background:transparent;border:1px solid var(--rule)}
+
+/* ---------- reader ---------- */
+#reader{position:fixed;inset:0;z-index:20;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  background:var(--r-bg,#FDFBF4);color:var(--r-ink,#1D1A15)}
+.rtop{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;
+  padding:calc(10px + env(safe-area-inset-top)) 14px 10px;background:var(--r-bg,#FDFBF4);
+  border-bottom:1px solid var(--r-rule,#E4DECC);z-index:2}
+.rtop button{font-size:14px;font-weight:700;padding:6px 10px;color:var(--r-mut,#7A7160)}
+.rtop .aa{font-family:var(--disp);font-size:16px;border:1px solid var(--r-rule,#E4DECC);border-radius:999px;padding:5px 14px}
+.rbody{max-width:640px;margin:0 auto;padding:26px 22px 30px}
+.rbody .kick{font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--press-2);margin-bottom:10px}
+.rbody h2{font-family:var(--disp);font-weight:700;font-size:calc(var(--fs,19px)*1.45);line-height:1.22;letter-spacing:-.01em}
+.rbody .by{margin:14px 0 0;font-size:13px;color:var(--r-mut,#7A7160);font-weight:600}
+.rbody .srcline{margin-top:4px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--r-mut,#7A7160)}
+.rbody hr{border:none;border-top:3px double var(--r-rule,#E4DECC);margin:18px 0 22px}
+.prose{font-family:var(--read);font-size:var(--fs,19px);line-height:var(--lh,1.72)}
+.prose.sans{font-family:var(--ui)}
+.prose.just p{text-align:justify;hyphens:auto;-webkit-hyphens:auto}
+.prose p{margin-bottom:1.05em}
+.prose p:first-child::first-letter{font-family:var(--disp);font-weight:700;font-size:3.1em;float:left;
+  line-height:.82;padding:.06em .1em 0 0;color:var(--press-2)}
+.rnav{display:flex;gap:10px;max-width:640px;margin:0 auto;padding:0 22px 40px}
+.rnav button{flex:1;border:1.5px solid var(--r-rule,#E4DECC);border-radius:12px;padding:13px 10px;
+  text-align:left;color:inherit}
+.rnav button b{display:block;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--r-mut,#7A7160);margin-bottom:4px}
+.rnav button span{font-family:var(--disp);font-size:13.5px;line-height:1.3;display:block}
+.rnav button:disabled{opacity:.35}
+
+/* Aa panel */
+#aaPanel{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--r-bg,#FDFBF4);color:var(--r-ink,#1D1A15);
+  border-top:1px solid var(--r-rule,#E4DECC);border-radius:18px 18px 0 0;padding:16px 18px calc(20px + env(safe-area-inset-bottom));
+  box-shadow:0 -12px 40px #0003;transform:translateY(105%);transition:transform .25s}
+#aaPanel.open{transform:none}
+.aa-row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.aa-row label{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--r-mut,#7A7160);width:64px}
+.aa-row input[type=range]{flex:1;accent-color:var(--press-2)}
+.seg{display:flex;flex:1;border:1.5px solid var(--r-rule,#E4DECC);border-radius:999px;overflow:hidden}
+.seg button{flex:1;padding:9px 4px;font-size:13px;font-weight:600;color:var(--r-mut,#7A7160)}
+.seg button.on{background:var(--press);color:#FBF6EA}
+.swatches{display:flex;gap:10px;flex:1}
+.sw{flex:1;height:42px;border-radius:10px;border:2px solid transparent;font-family:var(--read);font-size:15px}
+.sw.on{border-color:var(--press-2)}
+.sw[data-th=paper]{background:#FDFBF4;color:#1D1A15}
+.sw[data-th=sepia]{background:#F3E5C8;color:#46351D}
+.sw[data-th=slate]{background:#191C21;color:#D8D4CA}
+.sw[data-th=black]{background:#000;color:#B9B5AC}
+.scrim{position:fixed;inset:0;z-index:25;background:#0005}
+
+/* ---------- settings ---------- */
+.modal{position:fixed;inset:0;z-index:40;background:#000a;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--paper);width:100%;max-width:560px;border-radius:18px 18px 0 0;
+  padding:20px 20px calc(24px + env(safe-area-inset-bottom));max-height:88vh;overflow:auto}
+.sheet h2{font-family:var(--disp);font-size:20px;margin-bottom:4px}
+.sheet .note{font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:14px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.field input,.field select{width:100%;padding:12px 13px;border:1px solid var(--rule);border-radius:10px;background:#fff;font-size:14px}
+.warn{background:#FBEFEA;border:1px solid #E7C4B8;color:#7c2d12;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.55;margin-bottom:14px}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--paper);
+  padding:11px 18px;border-radius:999px;font-size:13px;z-index:60;box-shadow:0 8px 30px #0006}
+</style>
+</head>
+<body>
+
+<!-- ================= HOME / LIBRARY ================= -->
+<div id="vHome">
+  <header class="mast">
+    <h1>ਸਾਫ਼ ਪਾਠ<small>Saaf Path · Editorial Reader</small></h1>
+    <button class="gear" id="btnSettings">⚙ Setup</button>
+  </header>
+  <div class="dateline"><span id="todayLine"></span><span>Rampura Phul Edn.</span></div>
+
+  <div class="wrap">
+    <div class="drop">
+      <div class="big">Feed today's editorial PDF</div>
+      <p>Any compiled bundle — Hindu, Express, Mint, Dawn, FT… Text pages read cheap; scanned pages go through vision automatically. Headlines are kept exactly as printed.</p>
+      <button class="btn" id="btnPick">＋ Open PDF</button>
+      <input type="file" id="filePdf" accept="application/pdf" class="hide">
+    </div>
+
+    <div class="sec-label">Your Editions</div>
+    <div id="libList"></div>
+  </div>
+</div>
+
+<!-- ================= PROCESSING ================= -->
+<div id="vProc" class="hide">
+  <header class="mast">
+    <h1>Press Running<small id="procName">—</small></h1>
+    <button class="gear" id="btnCancel">✕ Stop</button>
+  </header>
+  <div class="proc">
+    <div class="pressbar"><i id="barFill"></i></div>
+    <div class="stat" id="procStat">Warming up…</div>
+    <div class="sub" id="procSub">Reading the file</div>
+    <div class="costline">API spend this run ≈ <b id="costNow">$0.00</b> <span id="costInr"></span></div>
+    <div class="ticker" id="ticker"></div>
+    <button class="btn ghost" id="btnFinishEarly" style="margin-top:18px" >Finish & read what's done</button>
+  </div>
+</div>
+
+<!-- ================= ARTICLE INDEX ================= -->
+<div id="vIndex" class="hide">
+  <div class="idxhead">
+    <button class="back" id="btnIdxBack">‹</button>
+    <div class="t"><b id="idxTitle"></b><i id="idxSub"></i></div>
+  </div>
+  <div class="search"><input id="idxSearch" type="search" placeholder="Filter headlines…"></div>
+  <div id="idxList" style="padding-bottom:60px"></div>
+</div>
+
+<!-- ================= READER ================= -->
+<div id="reader" class="hide">
+  <div class="rtop">
+    <button id="btnRdBack">‹ Index</button>
+    <button class="aa" id="btnAa">Aa</button>
+  </div>
+  <div class="rbody">
+    <div class="kick" id="rdKick"></div>
+    <h2 id="rdHead"></h2>
+    <div class="by" id="rdBy"></div>
+    <div class="srcline" id="rdSrc"></div>
+    <hr>
+    <div class="prose" id="rdBody"></div>
+  </div>
+  <div class="rnav">
+    <button id="btnPrev"><b>‹ Previous</b><span id="prevTitle"></span></button>
+    <button id="btnNext"><b>Next ›</b><span id="nextTitle"></span></button>
+  </div>
+</div>
+
+<div class="scrim hide" id="scrim"></div>
+<div id="aaPanel">
+  <div class="aa-row"><label>Size</label><input type="range" id="ctlSize" min="15" max="26" step="1"></div>
+  <div class="aa-row"><label>Spacing</label><input type="range" id="ctlLh" min="1.4" max="2.1" step="0.05"></div>
+  <div class="aa-row"><label>Font</label>
+    <div class="seg">
+      <button data-font="serif" id="fSerif">Serif</button>
+      <button data-font="sans" id="fSans">Sans</button>
+      <button data-font="just" id="fJust">Justify</button>
+    </div>
+  </div>
+  <div class="aa-row"><label>Page</label>
+    <div class="swatches">
+      <button class="sw" data-th="paper">Aa</button>
+      <button class="sw" data-th="sepia">Aa</button>
+      <button class="sw" data-th="slate">Aa</button>
+      <button class="sw" data-th="black">Aa</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SETTINGS ================= -->
+<div class="modal hide" id="mSettings">
+  <div class="sheet">
+    <h2>Setup</h2>
+    <p class="note">One-time. Key stays only in this phone's browser (localStorage) — never in the file, never uploaded anywhere except directly to Anthropic.</p>
+    <div class="field">
+      <label>Engine</label>
+      <select id="setModel">
+        <option value="gemini-2.5-flash">Gemini 2.5 Flash — FREE tier, recommended daily</option>
+        <option value="gemini-2.5-flash-lite">Gemini 2.5 Flash-Lite — FREE, higher daily limit</option>
+        <option value="claude-haiku-4-5">Claude Haiku 4.5 — paid, ~₹40–70 per bundle</option>
+        <option value="claude-sonnet-4-6">Claude Sonnet 4.6 — paid, best quality, ~5×</option>
+      </select>
+    </div>
+    <div class="field" id="fldGKey">
+      <label>Gemini API key (free at aistudio.google.com)</label>
+      <input type="password" id="setGKey" placeholder="AIza…">
+    </div>
+    <div class="field" id="fldAKey">
+      <label>Anthropic API key (only for Claude engines)</label>
+      <input type="password" id="setKey" placeholder="sk-ant-…">
+    </div>
+    <div class="warn">Gemini free tier = ₹0 per PDF (rate-limited to a few pages per minute, so a 40-page bundle takes ~10–15 min — start it, make chai). Claude engines are faster/paid. Processed editions are saved on the phone; reopening never costs anything.</div>
+    <button class="btn" id="btnSaveSet" style="width:100%">Save</button>
+    <button class="btn ghost" id="btnCloseSet" style="width:100%;margin-top:8px">Close</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =========================================================
+   Saaf Path — single-file editorial reader
+   Pipeline: PDF.js → per page (text layer OR page image)
+   → Claude → JSON articles → IndexedDB → reader UI
+   ========================================================= */
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+/* ---------- tiny helpers (declared first: no TDZ) ---------- */
+function $(id){ return document.getElementById(id); }
+function esc(s){ return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function toast(msg, ms){
+  var t = document.createElement('div'); t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(function(){ t.remove(); }, ms||2600);
+}
+function show(id){
+  ['vHome','vProc','vIndex','reader'].forEach(function(v){ $(v).classList.add('hide'); });
+  $(id).classList.remove('hide');
+  window.scrollTo(0,0);
+}
+
+/* ---------- persistent settings ---------- */
+var CFG = {
+  key: localStorage.getItem('sp_key') || '',
+  gkey: localStorage.getItem('sp_gkey') || '',
+  model: localStorage.getItem('sp_model') || 'gemini-2.5-flash'
+};
+function isGemini(){ return CFG.model.indexOf('gemini') === 0; }
+var READER = JSON.parse(localStorage.getItem('sp_reader') || '{}');
+READER = Object.assign({size:19, lh:1.72, font:'serif', just:true, theme:'paper'}, READER);
+function saveReader(){ localStorage.setItem('sp_reader', JSON.stringify(READER)); }
+
+/* ---------- IndexedDB ---------- */
+var DB = null;
+function openDB(){
+  return new Promise(function(res, rej){
+    var r = indexedDB.open('saafpath', 1);
+    r.onupgradeneeded = function(e){
+      e.target.result.createObjectStore('editions', {keyPath:'id'});
+    };
+    r.onsuccess = function(e){ DB = e.target.result; res(); };
+    r.onerror = function(){ rej(r.error); };
+  });
+}
+function dbPut(ed){
+  return new Promise(function(res, rej){
+    var tx = DB.transaction('editions','readwrite');
+    tx.objectStore('editions').put(ed);
+    tx.oncomplete = res; tx.onerror = function(){ rej(tx.error); };
+  });
+}
+function dbAll(){
+  return new Promise(function(res, rej){
+    var out = [];
+    var tx = DB.transaction('editions','readonly');
+    tx.objectStore('editions').openCursor().onsuccess = function(e){
+      var c = e.target.result;
+      if(c){ out.push(c.value); c.continue(); } else res(out);
+    };
+    tx.onerror = function(){ rej(tx.error); };
+  });
+}
+function dbDel(id){
+  return new Promise(function(res){
+    var tx = DB.transaction('editions','readwrite');
+    tx.objectStore('editions').delete(id);
+    tx.oncomplete = res;
+  });
+}
+
+/* ---------- pricing (USD per MTok in/out) ---------- */
+var PRICE = {
+  'gemini-2.5-flash':      {i:0, o:0},
+  'gemini-2.5-flash-lite': {i:0, o:0},
+  'claude-haiku-4-5':  {i:1,  o:5},
+  'claude-sonnet-4-6': {i:3, o:15}
+};
+var runCost = {i:0, o:0};
+function costUsd(){
+  var p = PRICE[CFG.model] || {i:0,o:0};
+  return (runCost.i/1e6)*p.i + (runCost.o/1e6)*p.o;
+}
+function paintCost(){
+  if(isGemini()){
+    $('costNow').textContent = '₹0 (free tier)';
+    $('costInr').textContent = '';
+    return;
+  }
+  var u = costUsd();
+  $('costNow').textContent = '$' + u.toFixed(3);
+  $('costInr').textContent = '(≈ ₹' + Math.round(u*88) + ')';
+}
+
+/* ---------- Claude call (direct browser, key in localStorage) ---------- */
+var EXTRACT_SYS =
+"You convert one newspaper editorial/op-ed page (given as raw extracted text or an image) into structured articles for a personal mobile reader. Return ONLY valid JSON, no markdown fences, shaped as:\n" +
+'{"source":"<newspaper name if identifiable, else Unknown>","articles":[{"headline":"","kicker":"","byline":"","body":"","continuationOf":""}]}\n' +
+"Rules:\n" +
+"1. HEADLINE VERBATIM. Copy each headline exactly as printed — same words, same capitalisation. Never rewrite, shorten, or 'improve' it.\n" +
+"2. Include EVERY editorial, op-ed, column, analysis piece, book review, obituary/tribute and archival piece on the page — not a selection. Group all reader letters into ONE article headlined exactly as the section is titled (e.g. Letters to the Editor), separating letters with blank lines and keeping each signature.\n" +
+"3. Skip only non-article furniture: mastheads, ads, crosswords, sudoku, quizzes, weather/forecast tables, calendars, stock tickers, photo captions, page numbers, promo boxes.\n" +
+"4. body = full article text, paragraphs separated by \\n\\n. Reconstruct correct column reading order. Merge words broken by line-end hyphens. Repair missing ligatures common in these PDFs: aected→affected, rst→first, signicant→significant, oer→offer, inuence→influence, ecient→efficient etc. Do not summarise, do not omit paragraphs, do not add anything.\n" +
+"5. kicker = small label above the headline (EDITORIAL, OPINION, PARLEY, EXPLAINER…) if present, else empty. byline = author and role line if present, else empty.\n" +
+"6. If a block is only the continuation of an article that began on another page (e.g. 'FROM PAGE 10'), set continuationOf to that article's headline (as printed in the jump line if given), headline may be empty, and put the continuation text in body.\n" +
+"7. If the page has no articles (pure ads/covers), return {\"source\":\"\",\"articles\":[]}.";
+
+function claude(content, maxTok){
+  return fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{
+      'content-type':'application/json',
+      'x-api-key': CFG.key,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body: JSON.stringify({
+      model: CFG.model,
+      max_tokens: maxTok || 8000,
+      system: EXTRACT_SYS,
+      messages:[{role:'user', content: content}]
+    })
+  }).then(function(r){
+    if(r.status === 429 || r.status === 529) throw {retry:true, status:r.status};
+    if(!r.ok) return r.text().then(function(t){ throw new Error('API '+r.status+': '+t.slice(0,180)); });
+    return r.json();
+  }).then(function(j){
+    return {
+      text: (j.content||[]).filter(function(b){return b.type==='text';})
+              .map(function(b){return b.text;}).join(''),
+      inTok: j.usage ? j.usage.input_tokens||0 : 0,
+      outTok: j.usage ? j.usage.output_tokens||0 : 0
+    };
+  });
+}
+function gemini(content, maxTok){
+  var parts = content.map(function(b){
+    if(b.type === 'image') return {inline_data:{mime_type:b.source.media_type, data:b.source.data}};
+    return {text: b.text};
+  });
+  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+            CFG.model + ':generateContent?key=' + encodeURIComponent(CFG.gkey);
+  return fetch(url, {
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body: JSON.stringify({
+      system_instruction:{parts:[{text: EXTRACT_SYS}]},
+      contents:[{role:'user', parts: parts}],
+      generationConfig:{maxOutputTokens: maxTok || 8192, responseMimeType:'application/json'}
+    })
+  }).then(function(r){
+    if(r.status === 429 || r.status === 503) throw {retry:true, status:r.status};
+    if(!r.ok) return r.text().then(function(t){ throw new Error('Gemini '+r.status+': '+t.slice(0,180)); });
+    return r.json();
+  }).then(function(j){
+    var c = j.candidates && j.candidates[0];
+    var txt = c && c.content && c.content.parts ?
+      c.content.parts.map(function(p){return p.text||'';}).join('') : '';
+    var u = j.usageMetadata || {};
+    return {text: txt, inTok: u.promptTokenCount||0, outTok: u.candidatesTokenCount||0};
+  });
+}
+function callModel(content, maxTok){
+  return isGemini() ? gemini(content, maxTok) : claude(content, maxTok);
+}
+function claudeWithRetry(content, maxTok, tries){
+  tries = tries || 0;
+  return callModel(content, maxTok).catch(function(e){
+    if(e && e.retry && tries < 5){
+      var wait = (isGemini() ? 8000 : 2500) * Math.pow(1.8, tries);
+      tick('⏳ Rate-limited, waiting ' + Math.round(wait/1000) + 's…');
+      return new Promise(function(res){ setTimeout(res, wait); })
+        .then(function(){ return claudeWithRetry(content, maxTok, tries+1); });
+    }
+    throw e;
+  });
+}
+function parseArticleJson(raw){
+  var s = (raw||'').trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'');
+  try { return JSON.parse(s); } catch(e){}
+  // salvage: cut back to last complete article object, close the JSON
+  var cut = s.lastIndexOf('},');
+  if(cut > -1){
+    try { return JSON.parse(s.slice(0, cut+1) + ']}'); } catch(e){}
+  }
+  var start = s.indexOf('{');
+  if(start > -1){ try { return JSON.parse(s.slice(start)); } catch(e){} }
+  return null;
+}
+
+/* ---------- PDF page → text or image ---------- */
+function pageText(page){
+  return page.getTextContent().then(function(tc){
+    var out = '', lastY = null;
+    tc.items.forEach(function(it){
+      if(!it.str) return;
+      var y = it.transform ? it.transform[5] : 0;
+      if(lastY !== null && Math.abs(y - lastY) > 4) out += '\n';
+      else if(out && !out.endsWith('\n')) out += ' ';
+      out += it.str;
+      lastY = y;
+    });
+    return out.trim();
+  });
+}
+function pageImage(page){
+  var vp1 = page.getViewport({scale:1});
+  var scale = Math.min(2200 / Math.max(vp1.width, vp1.height), 3);
+  var vp = page.getViewport({scale: scale});
+  var cv = document.createElement('canvas');
+  cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
+  var ctx = cv.getContext('2d');
+  return page.render({canvasContext:ctx, viewport:vp}).promise.then(function(){
+    var dataUrl = cv.toDataURL('image/jpeg', 0.82);
+    cv.width = cv.height = 0;
+    return dataUrl.split(',')[1];
+  });
+}
+
+/* ---------- processing run ---------- */
+var RUN = { cancel:false, edition:null };
+function tick(html){
+  var t = $('ticker');
+  t.insertAdjacentHTML('afterbegin', '<div>' + html + '</div>');
+  while(t.children.length > 60) t.lastChild.remove();
+}
+
+function processPdf(file){
+  if(isGemini() ? !CFG.gkey : !CFG.key){
+    openSettings();
+    toast(isGemini() ? 'Add your free Gemini key first' : 'Add your Anthropic key first');
+    return;
+  }
+  runCost = {i:0, o:0}; paintCost();
+  RUN.cancel = false;
+  var id = Date.now().toString(36);
+  RUN.edition = {
+    id: id,
+    name: file.name.replace(/\.pdf$/i,''),
+    createdAt: Date.now(),
+    pages: 0,
+    done: 0,
+    articles: [],
+    cost: 0
+  };
+  $('procName').textContent = RUN.edition.name;
+  $('procStat').textContent = 'Opening PDF…';
+  $('procSub').textContent = '';
+  $('ticker').innerHTML = '';
+  $('barFill').style.width = '0%';
+  show('vProc');
+
+  file.arrayBuffer().then(function(buf){
+    return pdfjsLib.getDocument({data:buf}).promise;
+  }).then(function(pdf){
+    RUN.edition.pages = pdf.numPages;
+    tick('<b>' + pdf.numPages + ' pages</b> found. Text pages → cheap path, scans → vision.');
+    var queue = [];
+    for(var i=1; i<=pdf.numPages; i++) queue.push(i);
+    var CONC = isGemini() ? 1 : 2, active = 0, articleCount = 0;
+
+    return new Promise(function(resolve){
+      function maybeDone(){
+        if((queue.length === 0 && active === 0) || RUN.cancel) resolve();
+      }
+      function paint(){
+        var pct = Math.round(100 * RUN.edition.done / RUN.edition.pages);
+        $('barFill').style.width = pct + '%';
+        $('procStat').textContent = 'Page ' + RUN.edition.done + ' / ' + RUN.edition.pages;
+        $('procSub').textContent = articleCount + ' articles set in type';
+        paintCost();
+      }
+      function next(){
+        if(RUN.cancel){ maybeDone(); return; }
+        if(queue.length === 0){ maybeDone(); return; }
+        if(active >= CONC) return;
+        var pageNo = queue.shift();
+        active++;
+        pdf.getPage(pageNo).then(function(page){
+          return pageText(page).then(function(txt){
+            if(txt.length >= 600){
+              tick('p.' + pageNo + ' — text layer (' + txt.length + ' ch)');
+              return claudeWithRetry([{type:'text', text:'PAGE ' + pageNo + ' RAW TEXT:\n\n' + txt}]);
+            }
+            tick('p.' + pageNo + ' — scanned, rendering for vision…');
+            return pageImage(page).then(function(b64){
+              return claudeWithRetry([
+                {type:'image', source:{type:'base64', media_type:'image/jpeg', data:b64}},
+                {type:'text', text:'This is page ' + pageNo + ' of an editorial compilation. Extract per the rules.'}
+              ]);
+            });
+          });
+        }).then(function(resp){
+          runCost.i += resp.inTok; runCost.o += resp.outTok;
+          var data = parseArticleJson(resp.text);
+          if(data && data.articles){
+            data.articles.forEach(function(a){
+              if(!a.body || !a.body.trim()) return;
+              RUN.edition.articles.push({
+                h: (a.headline||'').trim(),
+                kick: (a.kicker||'').trim(),
+                by: (a.byline||'').trim(),
+                body: a.body.trim(),
+                cont: (a.continuationOf||'').trim(),
+                src: (data.source||'').trim() || 'Unknown',
+                page: pageNo,
+                read: false
+              });
+              if(a.headline) articleCount++;
+            });
+            tick('p.' + pageNo + ' ✓ <b>' + data.articles.length + '</b> piece(s)' +
+                 (data.source ? ' — ' + esc(data.source) : ''));
+          } else {
+            tick('p.' + pageNo + ' — could not parse output, skipped');
+          }
+        }).catch(function(e){
+          tick('p.' + pageNo + ' ✗ ' + esc(e.message || 'failed'));
+        }).then(function(){
+          active--; RUN.edition.done++;
+          paint();
+          next(); maybeDone();
+        });
+      }
+      next(); next();
+    });
+  }).then(function(){
+    finishRun();
+  }).catch(function(e){
+    toast('Could not open PDF: ' + (e.message||e));
+    show('vHome');
+  });
+}
+
+function finishRun(){
+  var ed = RUN.edition;
+  if(!ed) return;
+  // stitch continuations onto their parents
+  var parents = ed.articles.filter(function(a){ return a.h; });
+  ed.articles.filter(function(a){ return !a.h && a.cont; }).forEach(function(c){
+    var key = c.cont.toLowerCase().split(/\s+/).slice(0,4).join(' ');
+    var hit = parents.find(function(p){ return p.h.toLowerCase().indexOf(key) > -1; }) ||
+              parents.find(function(p){ return key && key.indexOf(p.h.toLowerCase().slice(0,20)) > -1; });
+    if(hit){ hit.body += '\n\n' + c.body; }
+    else { c.h = '(continued) ' + c.cont; }
+  });
+  ed.articles = ed.articles.filter(function(a){ return a.h; });
+  // stable order: page, then as extracted
+  ed.articles.sort(function(a,b){ return a.page - b.page; });
+  ed.cost = costUsd();
+  dbPut(ed).then(function(){
+    toast(ed.articles.length + ' articles ready · $' + ed.cost.toFixed(2));
+    openEdition(ed);
+  });
+}
+
+/* ---------- library ---------- */
+function paintLibrary(){
+  dbAll().then(function(eds){
+    eds.sort(function(a,b){ return b.createdAt - a.createdAt; });
+    var box = $('libList');
+    if(!eds.length){
+      box.innerHTML = '<div class="empty">Nothing on the rack yet. Feed a PDF above — it stays saved here afterwards, free to reopen.</div>';
+      return;
+    }
+    box.innerHTML = '';
+    eds.forEach(function(ed){
+      var d = new Date(ed.createdAt);
+      var unread = ed.articles.filter(function(a){ return !a.read; }).length;
+      var el = document.createElement('div');
+      el.className = 'edition';
+      el.innerHTML =
+        '<div class="folio">' + ed.articles.length + '<span>PIECES</span></div>' +
+        '<div class="meta"><b>' + esc(ed.name) + '</b>' +
+        '<i>' + d.toLocaleDateString('en-IN',{day:'numeric',month:'short'}) +
+        ' · ' + ed.pages + ' pp · ' + unread + ' unread</i></div>' +
+        '<button class="del" aria-label="Delete">🗑</button>';
+      el.querySelector('.meta').onclick = function(){ openEdition(ed); };
+      el.querySelector('.folio').onclick = function(){ openEdition(ed); };
+      el.querySelector('.del').onclick = function(){
+        if(confirm('Delete "' + ed.name + '"?')) dbDel(ed.id).then(paintLibrary);
+      };
+      box.appendChild(el);
+    });
+  });
+}
+
+/* ---------- article index ---------- */
+var CUR = { ed:null, idx:-1, order:[] };
+function openEdition(ed){
+  CUR.ed = ed;
+  $('idxTitle').textContent = ed.name;
+  $('idxSub').textContent = ed.articles.length + ' articles · ' + ed.pages + ' pages';
+  $('idxSearch').value = '';
+  paintIndex('');
+  show('vIndex');
+}
+function paintIndex(filter){
+  var list = $('idxList');
+  list.innerHTML = '';
+  var f = (filter||'').toLowerCase();
+  var bySrc = {};
+  CUR.ed.articles.forEach(function(a, i){
+    if(f && a.h.toLowerCase().indexOf(f) === -1 && a.by.toLowerCase().indexOf(f) === -1) return;
+    (bySrc[a.src] = bySrc[a.src] || []).push(i);
+  });
+  CUR.order = [];
+  Object.keys(bySrc).forEach(function(src){
+    var grp = document.createElement('div');
+    grp.className = 'srcgrp';
+    grp.innerHTML = '<h3>' + esc(src) + '</h3>';
+    bySrc[src].forEach(function(i){
+      CUR.order.push(i);
+      var a = CUR.ed.articles[i];
+      var b = document.createElement('button');
+      b.className = 'art' + (a.read ? ' read' : '');
+      b.innerHTML =
+        (a.kick ? '<div class="kick">' + esc(a.kick) + '</div>' : '') +
+        '<h4>' + esc(a.h) + '</h4>' +
+        '<div class="by"><span class="dot"></span>' +
+        esc(a.by || 'p. ' + a.page) + '</div>';
+      b.onclick = function(){ openArticle(i); };
+      grp.appendChild(b);
+    });
+    list.appendChild(grp);
+  });
+  if(!CUR.order.length){
+    list.innerHTML = '<div class="empty" style="padding:20px 18px">No matching headlines.</div>';
+  }
+}
+
+/* ---------- reader ---------- */
+var THEMES = {
+  paper:{bg:'#FDFBF4', ink:'#1D1A15', rule:'#E4DECC', mut:'#7A7160', bar:'#FDFBF4'},
+  sepia:{bg:'#F3E5C8', ink:'#46351D', rule:'#DCC9A4', mut:'#8A7350', bar:'#F3E5C8'},
+  slate:{bg:'#191C21', ink:'#D8D4CA', rule:'#31353D', mut:'#8B8F98', bar:'#191C21'},
+  black:{bg:'#000000', ink:'#B9B5AC', rule:'#242424', mut:'#6F6C66', bar:'#000000'}
+};
+function applyReader(){
+  var t = THEMES[READER.theme] || THEMES.paper;
+  var r = $('reader');
+  r.style.setProperty('--r-bg', t.bg);
+  r.style.setProperty('--r-ink', t.ink);
+  r.style.setProperty('--r-rule', t.rule);
+  r.style.setProperty('--r-mut', t.mut);
+  r.style.setProperty('--fs', READER.size + 'px');
+  r.style.setProperty('--lh', READER.lh);
+  var aa = $('aaPanel');
+  aa.style.setProperty('--r-bg', t.bg);
+  aa.style.setProperty('--r-ink', t.ink);
+  aa.style.setProperty('--r-rule', t.rule);
+  aa.style.setProperty('--r-mut', t.mut);
+  aa.style.color = t.ink;
+  document.querySelector('meta[name=theme-color]').content = t.bar;
+  var prose = $('rdBody');
+  prose.classList.toggle('sans', READER.font === 'sans');
+  prose.classList.toggle('just', !!READER.just);
+  $('ctlSize').value = READER.size;
+  $('ctlLh').value = READER.lh;
+  $('fSerif').classList.toggle('on', READER.font === 'serif');
+  $('fSans').classList.toggle('on', READER.font === 'sans');
+  $('fJust').classList.toggle('on', !!READER.just);
+  document.querySelectorAll('.sw').forEach(function(s){
+    s.classList.toggle('on', s.dataset.th === READER.theme);
+  });
+}
+function openArticle(i){
+  CUR.idx = i;
+  var a = CUR.ed.articles[i];
+  $('rdKick').textContent = a.kick || '';
+  $('rdKick').classList.toggle('hide', !a.kick);
+  $('rdHead').textContent = a.h;
+  $('rdBy').textContent = a.by || '';
+  $('rdBy').classList.toggle('hide', !a.by);
+  $('rdSrc').textContent = a.src + ' · page ' + a.page;
+  $('rdBody').innerHTML = a.body.split(/\n{2,}/).map(function(p){
+    return '<p>' + esc(p).replace(/\n/g,' ') + '</p>';
+  }).join('');
+  var pos = CUR.order.indexOf(i);
+  var prev = pos > 0 ? CUR.ed.articles[CUR.order[pos-1]] : null;
+  var next = pos > -1 && pos < CUR.order.length-1 ? CUR.ed.articles[CUR.order[pos+1]] : null;
+  $('btnPrev').disabled = !prev;
+  $('btnNext').disabled = !next;
+  $('prevTitle').textContent = prev ? prev.h : '—';
+  $('nextTitle').textContent = next ? next.h : 'End of edition';
+  if(!a.read){ a.read = true; dbPut(CUR.ed); }
+  applyReader();
+  show('reader');
+  $('reader').scrollTop = 0;
+}
+function step(d){
+  var pos = CUR.order.indexOf(CUR.idx) + d;
+  if(pos >= 0 && pos < CUR.order.length) openArticle(CUR.order[pos]);
+}
+
+/* ---------- settings modal ---------- */
+function openSettings(){
+  $('setKey').value = CFG.key;
+  $('setGKey').value = CFG.gkey;
+  $('setModel').value = CFG.model;
+  $('mSettings').classList.remove('hide');
+}
+$('btnSettings').onclick = openSettings;
+$('btnCloseSet').onclick = function(){ $('mSettings').classList.add('hide'); };
+$('btnSaveSet').onclick = function(){
+  CFG.key = $('setKey').value.trim();
+  CFG.gkey = $('setGKey').value.trim();
+  CFG.model = $('setModel').value;
+  localStorage.setItem('sp_key', CFG.key);
+  localStorage.setItem('sp_gkey', CFG.gkey);
+  localStorage.setItem('sp_model', CFG.model);
+  $('mSettings').classList.add('hide');
+  toast('Saved');
+};
+
+/* ---------- wiring ---------- */
+$('btnPick').onclick = function(){ $('filePdf').click(); };
+$('filePdf').onchange = function(e){
+  var f = e.target.files[0];
+  e.target.value = '';
+  if(f) processPdf(f);
+};
+$('btnCancel').onclick = function(){
+  RUN.cancel = true;
+  toast('Stopping after current pages…');
+};
+$('btnFinishEarly').onclick = function(){
+  RUN.cancel = true;
+  setTimeout(finishRun, 400);
+};
+$('btnIdxBack').onclick = function(){ paintLibrary(); show('vHome'); };
+$('idxSearch').oninput = function(e){ paintIndex(e.target.value); };
+$('btnRdBack').onclick = function(){
+  paintIndex($('idxSearch').value);
+  show('vIndex');
+};
+$('btnPrev').onclick = function(){ step(-1); };
+$('btnNext').onclick = function(){ step(1); };
+
+/* Aa panel */
+function openAa(open){
+  $('aaPanel').classList.toggle('open', open);
+  $('scrim').classList.toggle('hide', !open);
+}
+$('btnAa').onclick = function(){ openAa(true); };
+$('scrim').onclick = function(){ openAa(false); };
+$('ctlSize').oninput = function(e){ READER.size = +e.target.value; saveReader(); applyReader(); };
+$('ctlLh').oninput = function(e){ READER.lh = +e.target.value; saveReader(); applyReader(); };
+$('fSerif').onclick = function(){ READER.font='serif'; saveReader(); applyReader(); };
+$('fSans').onclick = function(){ READER.font='sans'; saveReader(); applyReader(); };
+$('fJust').onclick = function(){ READER.just=!READER.just; saveReader(); applyReader(); };
+document.querySelectorAll('.sw').forEach(function(s){
+  s.onclick = function(){ READER.theme = s.dataset.th; saveReader(); applyReader(); };
+});
+
+/* ---------- boot ---------- */
+$('todayLine').textContent = new Date().toLocaleDateString('en-IN',
+  {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+openDB().then(function(){
+  paintLibrary();
+  if(isGemini() ? !CFG.gkey : !CFG.key) setTimeout(openSettings, 600);
+});
+</script>
+</body>
+</html>
