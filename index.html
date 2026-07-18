@@ -261,8 +261,8 @@ header.mast{padding:calc(14px + env(safe-area-inset-top)) 18px 10px;border-botto
       </select>
     </div>
     <div class="field" id="fldGKey">
-      <label>Gemini API key (free at aistudio.google.com)</label>
-      <input type="password" id="setGKey" placeholder="AIza…">
+      <label>Gemini API key(s) — paste 2–3 separated by commas to beat rate limits</label>
+      <input type="password" id="setGKey" placeholder="AIza…, AIza…, AIza…">
     </div>
     <div class="field" id="fldAKey">
       <label>Anthropic API key (only for Claude engines)</label>
@@ -411,21 +411,32 @@ function claude(content, maxTok){
     };
   });
 }
+var gkRot = 0, gkLast = 0;
+function gkeys(){
+  return CFG.gkey.split(',').map(function(k){return k.trim();}).filter(Boolean);
+}
 function gemini(content, maxTok){
-  var parts = content.map(function(b){
-    if(b.type === 'image') return {inline_data:{mime_type:b.source.media_type, data:b.source.data}};
-    return {text: b.text};
-  });
-  var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
-            CFG.model + ':generateContent?key=' + encodeURIComponent(CFG.gkey);
-  return fetch(url, {
-    method:'POST',
-    headers:{'content-type':'application/json'},
-    body: JSON.stringify({
-      system_instruction:{parts:[{text: EXTRACT_SYS}]},
-      contents:[{role:'user', parts: parts}],
-      generationConfig:{maxOutputTokens: maxTok || 8192, responseMimeType:'application/json'}
-    })
+  var keys = gkeys();
+  var key = keys[gkRot % keys.length]; gkRot++;
+  // proactive pacing: keep a minimum gap between calls, shared across keys
+  var gap = Math.max(0, Math.ceil(6500 / Math.max(keys.length,1)) - (Date.now() - gkLast));
+  return new Promise(function(res){ setTimeout(res, gap); }).then(function(){
+    gkLast = Date.now();
+    var parts = content.map(function(b){
+      if(b.type === 'image') return {inline_data:{mime_type:b.source.media_type, data:b.source.data}};
+      return {text: b.text};
+    });
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+              CFG.model + ':generateContent?key=' + encodeURIComponent(key);
+    return fetch(url, {
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body: JSON.stringify({
+        system_instruction:{parts:[{text: EXTRACT_SYS}]},
+        contents:[{role:'user', parts: parts}],
+        generationConfig:{maxOutputTokens: maxTok || 8192, responseMimeType:'application/json'}
+      })
+    });
   }).then(function(r){
     if(r.status === 429 || r.status === 503) throw {retry:true, status:r.status};
     if(!r.ok) return r.text().then(function(t){ throw new Error('Gemini '+r.status+': '+t.slice(0,180)); });
@@ -445,7 +456,7 @@ function claudeWithRetry(content, maxTok, tries){
   tries = tries || 0;
   return callModel(content, maxTok).catch(function(e){
     if(e && e.retry && tries < 5){
-      var wait = (isGemini() ? 8000 : 2500) * Math.pow(1.8, tries);
+      var wait = (isGemini() ? 5000 : 2500) * Math.pow(1.8, tries);
       tick('⏳ Rate-limited, waiting ' + Math.round(wait/1000) + 's…');
       return new Promise(function(res){ setTimeout(res, wait); })
         .then(function(){ return claudeWithRetry(content, maxTok, tries+1); });
@@ -535,7 +546,7 @@ function processPdf(file){
     tick('<b>' + pdf.numPages + ' pages</b> found. Text pages → cheap path, scans → vision.');
     var queue = [];
     for(var i=1; i<=pdf.numPages; i++) queue.push(i);
-    var CONC = isGemini() ? 1 : 2, active = 0, articleCount = 0;
+    var CONC = isGemini() ? (gkeys().length >= 3 ? 2 : 1) : 2, active = 0, articleCount = 0;
 
     return new Promise(function(resolve){
       function maybeDone(){
