@@ -165,7 +165,7 @@ header.mast{padding:calc(14px + env(safe-area-inset-top)) 18px 10px;border-botto
     <h1>ਸਾਫ਼ ਪਾਠ<small>Saaf Path · Editorial Reader</small></h1>
     <button class="gear" id="btnSettings">⚙ Setup</button>
   </header>
-  <div class="dateline"><span id="todayLine"></span><span>Rampura Phul Edn. · v7</span></div>
+  <div class="dateline"><span id="todayLine"></span><span>Rampura Phul Edn. · v10</span></div>
 
   <div class="wrap">
     <div class="drop">
@@ -521,9 +521,9 @@ function pageText(page){
     return out.trim();
   });
 }
-function renderPage(page){
+function renderPage(page, longSide){
   var vp1 = page.getViewport({scale:1});
-  var scale = Math.min(1800 / Math.max(vp1.width, vp1.height), 3);
+  var scale = Math.min((longSide || 1800) / Math.max(vp1.width, vp1.height), 4);
   var vp = page.getViewport({scale: scale});
   var cv = document.createElement('canvas');
   cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
@@ -627,18 +627,22 @@ function processPdf(file){
             prep.push({pageNo:pageNo, kind:'text', text:txt});
             return;
           }
-          return renderPage(page).then(function(img){
-            return ocrText(img.dataUrl).then(function(ocr){
-              if(ocr.text.length >= 800 && ocr.conf >= 55){
+          return renderPage(page, 3000).then(function(big){
+            return ocrText(big.dataUrl).then(function(ocr){
+              if(ocr.text.length >= 800 && ocr.conf >= 50){
                 tick('p.' + pageNo + ' — OCR ✓ (conf ' + Math.round(ocr.conf) + ', ' + ocr.text.length + ' ch)');
                 prep.push({pageNo:pageNo, kind:'ocr', text:ocr.text});
-              } else {
-                tick('p.' + pageNo + ' — OCR weak (conf ' + Math.round(ocr.conf) + ') → will need vision');
-                prep.push({pageNo:pageNo, kind:'vision', b64:img.b64});
+                return;
               }
+              tick('p.' + pageNo + ' — OCR weak (conf ' + Math.round(ocr.conf) + ') → will need vision');
+              return renderPage(page, 1800).then(function(img){
+                prep.push({pageNo:pageNo, kind:'vision', b64:img.b64});
+              });
             }).catch(function(){
               tick('p.' + pageNo + ' — OCR unavailable → will need vision');
-              prep.push({pageNo:pageNo, kind:'vision', b64:img.b64});
+              return renderPage(page, 1800).then(function(img){
+                prep.push({pageNo:pageNo, kind:'vision', b64:img.b64});
+              });
             });
           });
         });
@@ -653,11 +657,13 @@ function processPdf(file){
       var nO = prep.filter(function(p){return p.kind==='ocr';}).length;
       var nV = prep.filter(function(p){return p.kind==='vision';}).length;
       tick('<b>Stage 1 done.</b> ' + nT + ' text · ' + nO + ' OCR · ' + nV + ' vision. Sending to AI…');
+      var planStr = nT + ' text · ' + nO + ' OCR · ' + nV + ' vision';
 
       /* ---------- STAGE 2 : AI typesetting at quota pace ---------- */
       var queue = prep.slice();
       var CONC = isGemini() ? (gkeys().length >= 3 ? 2 : 1) : 2, active = 0, articleCount = 0;
       var requeued = {};
+      var sessionOverride = null, anySuccess = false;
 
       return new Promise(function(resolve){
         function maybeDone(){
@@ -667,7 +673,7 @@ function processPdf(file){
           var pct = 30 + Math.round(70 * RUN.edition.done / RUN.edition.pages);
           $('barFill').style.width = pct + '%';
           $('procStat').textContent = 'Stage 2 · page ' + RUN.edition.done + ' / ' + RUN.edition.pages;
-          $('procSub').textContent = articleCount + ' articles set in type';
+          $('procSub').textContent = articleCount + ' articles set in type · local read: ' + planStr;
           paintCost();
         }
         function contentFor(p){
@@ -691,10 +697,12 @@ function processPdf(file){
           var pageNo = p.pageNo;
           var postponed = false;
           active++;
-          var override = (requeued[pageNo] && isGemini() && CFG.model !== 'gemini-3.1-flash-lite')
-            ? 'gemini-3.1-flash-lite' : undefined;
-          if(override) tick('p.' + pageNo + ' — retrying on Flash-Lite (separate free quota)');
+          var override = sessionOverride ||
+            ((requeued[pageNo] && isGemini() && CFG.model !== 'gemini-3.1-flash-lite')
+              ? 'gemini-3.1-flash-lite' : undefined);
+          if(override && !sessionOverride) tick('p.' + pageNo + ' — retrying on Flash-Lite (separate free quota)');
           extractContent(contentFor(p), pageNo, override).then(function(data){
+            anySuccess = true;
             var n = 0;
             (data.articles||[]).forEach(function(a){
               if(!a.body || !a.body.trim()) return;
@@ -718,8 +726,26 @@ function processPdf(file){
               queue.push(p);
               tick('p.' + pageNo + ' ⏸ still limited — postponed to end of queue');
               postponed = true;
+              if(!anySuccess && !sessionOverride && isGemini() && CFG.model !== 'gemini-3.1-flash-lite'){
+                sessionOverride = 'gemini-3.1-flash-lite';
+                tick('🚨 <b>Primary quota looks exhausted</b> — switching the whole run to Flash-Lite (separate free bucket)');
+              }
             } else {
               tick('p.' + pageNo + ' ✗ ' + esc(e.message || 'rate limit persisted'));
+              if(p.kind !== 'vision' && p.text){
+                RUN.edition.articles.push({
+                  h: 'Page ' + pageNo + ' — raw text (AI unavailable)',
+                  kick: 'RAW · UNFORMATTED',
+                  by: '',
+                  body: p.text,
+                  cont: '',
+                  src: 'Raw local read',
+                  page: pageNo,
+                  read: false
+                });
+                articleCount++;
+                tick('p.' + pageNo + ' 📄 saved raw local text so you can still read it');
+              }
             }
           }).then(function(){
             active--;
