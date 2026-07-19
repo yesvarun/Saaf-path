@@ -165,7 +165,7 @@ header.mast{padding:calc(14px + env(safe-area-inset-top)) 18px 10px;border-botto
     <h1>ਸਾਫ਼ ਪਾਠ<small>Saaf Path · Editorial Reader</small></h1>
     <button class="gear" id="btnSettings">⚙ Setup</button>
   </header>
-  <div class="dateline"><span id="todayLine"></span><span>Rampura Phul Edn.</span></div>
+  <div class="dateline"><span id="todayLine"></span><span>Rampura Phul Edn. · v7</span></div>
 
   <div class="wrap">
     <div class="drop">
@@ -475,12 +475,18 @@ function gemini(content, maxTok, override){
 function callModel(content, maxTok, override){
   return isGemini() ? gemini(content, maxTok, override) : claude(content, maxTok);
 }
+function transient(e){
+  return !!(e && (e.retry || e.name === 'TypeError' || /failed to fetch|network/i.test(e.message||'')));
+}
 function claudeWithRetry(content, maxTok, tries, override){
   tries = tries || 0;
   return callModel(content, maxTok, override).catch(function(e){
-    if(e && e.retry && tries < 5){
-      var wait = e.immediate ? 300 : (isGemini() ? 5000 : 2500) * Math.pow(1.8, tries);
-      if(!e.immediate) tick('⏳ Rate-limited, waiting ' + Math.round(wait/1000) + 's…');
+    if(transient(e) && tries < 5){
+      var wait = (e && e.immediate) ? 300 : (isGemini() ? 5000 : 2500) * Math.pow(1.8, tries);
+      if(!(e && e.immediate)){
+        tick(e && e.retry ? '⏳ Rate-limited, waiting ' + Math.round(wait/1000) + 's…'
+                          : '📶 Network dropped, retrying in ' + Math.round(wait/1000) + 's…');
+      }
       return new Promise(function(res){ setTimeout(res, wait); })
         .then(function(){ return claudeWithRetry(content, maxTok, tries+1, override); });
     }
@@ -605,98 +611,125 @@ function processPdf(file){
     return pdfjsLib.getDocument({data:buf}).promise;
   }).then(function(pdf){
     RUN.edition.pages = pdf.numPages;
-    tick('<b>' + pdf.numPages + ' pages</b> found. Ladder: text layer → free on-phone OCR → vision, with Flash-Lite auto-rescue.');
-    var queue = [];
-    for(var i=1; i<=pdf.numPages; i++) queue.push(i);
-    var CONC = isGemini() ? (gkeys().length >= 3 ? 2 : 1) : 2, active = 0, articleCount = 0;
-    var requeued = {};
+    tick('<b>' + pdf.numPages + ' pages</b> found. Stage 1: reading every page locally (no API, no limits). Stage 2: AI typesetting at quota pace.');
 
-    return new Promise(function(resolve){
-      function maybeDone(){
-        if((queue.length === 0 && active === 0) || RUN.cancel) resolve();
-      }
-      function paint(){
-        var pct = Math.round(100 * RUN.edition.done / RUN.edition.pages);
-        $('barFill').style.width = pct + '%';
-        $('procStat').textContent = 'Page ' + RUN.edition.done + ' / ' + RUN.edition.pages;
-        $('procSub').textContent = articleCount + ' articles set in type';
-        paintCost();
-      }
-      function next(){
-        if(RUN.cancel){ maybeDone(); return; }
-        if(queue.length === 0){ maybeDone(); return; }
-        if(active >= CONC) return;
-        var pageNo = queue.shift();
-        var postponed = false;
-        active++;
-        pdf.getPage(pageNo).then(function(page){
+    /* ---------- STAGE 1 : local read — text layer or on-phone OCR ---------- */
+    var prep = [];
+    function stage1(pageNo){
+      if(RUN.cancel || pageNo > pdf.numPages) return Promise.resolve();
+      $('procStat').textContent = 'Stage 1 · reading page ' + pageNo + ' / ' + pdf.numPages;
+      $('procSub').textContent = 'Local text + OCR — free, unlimited';
+      $('barFill').style.width = Math.round(30 * pageNo / pdf.numPages) + '%';
+      return pdf.getPage(pageNo).then(function(page){
+        return pageText(page).then(function(txt){
+          if(txt.length >= 600){
+            tick('p.' + pageNo + ' — text layer (' + txt.length + ' ch)');
+            prep.push({pageNo:pageNo, kind:'text', text:txt});
+            return;
+          }
+          return renderPage(page).then(function(img){
+            return ocrText(img.dataUrl).then(function(ocr){
+              if(ocr.text.length >= 800 && ocr.conf >= 55){
+                tick('p.' + pageNo + ' — OCR ✓ (conf ' + Math.round(ocr.conf) + ', ' + ocr.text.length + ' ch)');
+                prep.push({pageNo:pageNo, kind:'ocr', text:ocr.text});
+              } else {
+                tick('p.' + pageNo + ' — OCR weak (conf ' + Math.round(ocr.conf) + ') → will need vision');
+                prep.push({pageNo:pageNo, kind:'vision', b64:img.b64});
+              }
+            }).catch(function(){
+              tick('p.' + pageNo + ' — OCR unavailable → will need vision');
+              prep.push({pageNo:pageNo, kind:'vision', b64:img.b64});
+            });
+          });
+        });
+      }).catch(function(e){
+        tick('p.' + pageNo + ' ✗ local read failed: ' + esc(e.message||''));
+      }).then(function(){ return stage1(pageNo + 1); });
+    }
+
+    return stage1(1).then(function(){
+      if(RUN.cancel) return;
+      var nT = prep.filter(function(p){return p.kind==='text';}).length;
+      var nO = prep.filter(function(p){return p.kind==='ocr';}).length;
+      var nV = prep.filter(function(p){return p.kind==='vision';}).length;
+      tick('<b>Stage 1 done.</b> ' + nT + ' text · ' + nO + ' OCR · ' + nV + ' vision. Sending to AI…');
+
+      /* ---------- STAGE 2 : AI typesetting at quota pace ---------- */
+      var queue = prep.slice();
+      var CONC = isGemini() ? (gkeys().length >= 3 ? 2 : 1) : 2, active = 0, articleCount = 0;
+      var requeued = {};
+
+      return new Promise(function(resolve){
+        function maybeDone(){
+          if((queue.length === 0 && active === 0) || RUN.cancel) resolve();
+        }
+        function paint(){
+          var pct = 30 + Math.round(70 * RUN.edition.done / RUN.edition.pages);
+          $('barFill').style.width = pct + '%';
+          $('procStat').textContent = 'Stage 2 · page ' + RUN.edition.done + ' / ' + RUN.edition.pages;
+          $('procSub').textContent = articleCount + ' articles set in type';
+          paintCost();
+        }
+        function contentFor(p){
+          if(p.kind === 'vision'){
+            return [
+              {type:'image', source:{type:'base64', media_type:'image/jpeg', data:p.b64}},
+              {type:'text', text:'This is page ' + p.pageNo + ' of an editorial compilation. Extract per the rules.'}
+            ];
+          }
+          if(p.kind === 'ocr'){
+            return [{type:'text',
+              text:'PAGE ' + p.pageNo + ' OCR TEXT (may contain OCR errors — silently correct them):\n\n' + p.text}];
+          }
+          return [{type:'text', text:'PAGE ' + p.pageNo + ' RAW TEXT:\n\n' + p.text}];
+        }
+        function next(){
+          if(RUN.cancel){ maybeDone(); return; }
+          if(queue.length === 0){ maybeDone(); return; }
+          if(active >= CONC) return;
+          var p = queue.shift();
+          var pageNo = p.pageNo;
+          var postponed = false;
+          active++;
           var override = (requeued[pageNo] && isGemini() && CFG.model !== 'gemini-3.1-flash-lite')
             ? 'gemini-3.1-flash-lite' : undefined;
           if(override) tick('p.' + pageNo + ' — retrying on Flash-Lite (separate free quota)');
-          function visionCall(img){
-            return extractContent([
-              {type:'image', source:{type:'base64', media_type:'image/jpeg', data:img.b64}},
-              {type:'text', text:'This is page ' + pageNo + ' of an editorial compilation. Extract per the rules.'}
-            ], pageNo, override);
-          }
-          return pageText(page).then(function(txt){
-            if(txt.length >= 600){
-              tick('p.' + pageNo + ' — text layer (' + txt.length + ' ch)');
-              return extractContent([{type:'text',
-                text:'PAGE ' + pageNo + ' RAW TEXT:\n\n' + txt}], pageNo, override);
-            }
-            tick('p.' + pageNo + ' — scan → free on-phone OCR…');
-            return renderPage(page).then(function(img){
-              return ocrText(img.dataUrl).then(function(ocr){
-                if(ocr.text.length >= 800 && ocr.conf >= 55){
-                  tick('p.' + pageNo + ' — OCR good (conf ' + Math.round(ocr.conf) + ') → cheap text call');
-                  return extractContent([{type:'text',
-                    text:'PAGE ' + pageNo + ' OCR TEXT (may contain OCR errors — silently correct them):\n\n' + ocr.text}],
-                    pageNo, override);
-                }
-                tick('p.' + pageNo + ' — OCR weak (conf ' + Math.round(ocr.conf) + ') → vision');
-                return visionCall(img);
-              }).catch(function(){
-                tick('p.' + pageNo + ' — OCR unavailable → vision');
-                return visionCall(img);
+          extractContent(contentFor(p), pageNo, override).then(function(data){
+            var n = 0;
+            (data.articles||[]).forEach(function(a){
+              if(!a.body || !a.body.trim()) return;
+              RUN.edition.articles.push({
+                h: (a.headline||'').trim(),
+                kick: (a.kicker||'').trim(),
+                by: (a.byline||'').trim(),
+                body: a.body.trim(),
+                cont: (a.continuationOf||'').trim(),
+                src: (data.source||'').trim() || 'Unknown',
+                page: pageNo,
+                read: false
               });
+              if(a.headline){ articleCount++; n++; }
             });
+            tick('p.' + pageNo + ' ✓ <b>' + n + '</b> piece(s)' +
+                 (data.source ? ' — ' + esc(data.source) : ''));
+          }).catch(function(e){
+            if(transient(e) && !requeued[pageNo]){
+              requeued[pageNo] = true;
+              queue.push(p);
+              tick('p.' + pageNo + ' ⏸ still limited — postponed to end of queue');
+              postponed = true;
+            } else {
+              tick('p.' + pageNo + ' ✗ ' + esc(e.message || 'rate limit persisted'));
+            }
+          }).then(function(){
+            active--;
+            if(!postponed) RUN.edition.done++;
+            paint();
+            next(); maybeDone();
           });
-        }).then(function(data){
-          var n = 0;
-          (data.articles||[]).forEach(function(a){
-            if(!a.body || !a.body.trim()) return;
-            RUN.edition.articles.push({
-              h: (a.headline||'').trim(),
-              kick: (a.kicker||'').trim(),
-              by: (a.byline||'').trim(),
-              body: a.body.trim(),
-              cont: (a.continuationOf||'').trim(),
-              src: (data.source||'').trim() || 'Unknown',
-              page: pageNo,
-              read: false
-            });
-            if(a.headline){ articleCount++; n++; }
-          });
-          tick('p.' + pageNo + ' ✓ <b>' + n + '</b> piece(s)' +
-               (data.source ? ' — ' + esc(data.source) : ''));
-        }).catch(function(e){
-          if(e && e.retry && !requeued[pageNo]){
-            requeued[pageNo] = true;
-            queue.push(pageNo);
-            tick('p.' + pageNo + ' ⏸ still limited — postponed to end of queue');
-            postponed = true;
-          } else {
-            tick('p.' + pageNo + ' ✗ ' + esc(e.message || 'rate limit persisted — try Flash-Lite engine'));
-          }
-        }).then(function(){
-          active--;
-          if(!postponed) RUN.edition.done++;
-          paint();
-          next(); maybeDone();
-        });
-      }
-      next(); next();
+        }
+        next(); next();
+      });
     });
   }).then(function(){
     finishRun();
