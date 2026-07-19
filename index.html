@@ -165,7 +165,7 @@ header.mast{padding:calc(14px + env(safe-area-inset-top)) 18px 10px;border-botto
     <h1>ਸਾਫ਼ ਪਾਠ<small>Saaf Path · Editorial Reader</small></h1>
     <button class="gear" id="btnSettings">⚙ Setup</button>
   </header>
-  <div class="dateline"><span id="todayLine"></span><span>Rampura Phul Edn. · v10</span></div>
+  <div class="dateline"><span id="todayLine"></span><span>Rampura Phul Edn. · v12</span></div>
 
   <div class="wrap">
     <div class="drop">
@@ -447,16 +447,21 @@ function gemini(content, maxTok, override){
       body: JSON.stringify({
         system_instruction:{parts:[{text: EXTRACT_SYS}]},
         contents:[{role:'user', parts: parts}],
-        generationConfig:{maxOutputTokens: maxTok || 32768, responseMimeType:'application/json'}
+        generationConfig:{maxOutputTokens: maxTok || (model.indexOf('lite') > -1 ? 8192 : 32768), responseMimeType:'application/json'}
       })
     });
   }).then(function(r){
     if(r.status === 429 || r.status === 503) throw {retry:true, status:r.status};
     if(r.status === 400 || r.status === 403){
-      gkDead[key] = true;
-      tick('🔑 Key ending …' + key.slice(-4) + ' rejected (' + r.status + ') — dropped from rotation');
-      if(liveGkeys().length) throw {retry:true, immediate:true};
-      throw new Error('All Gemini keys rejected — re-check them in Setup');
+      return r.text().then(function(t){
+        if(/api key|credential|permission denied/i.test(t)){
+          gkDead[key] = true;
+          tick('🔑 Key ending …' + key.slice(-4) + ' rejected — dropped from rotation');
+          if(liveGkeys().length) throw {retry:true, immediate:true};
+          throw new Error('All Gemini keys rejected — re-check them in Setup');
+        }
+        throw new Error('Gemini ' + r.status + ': ' + t.slice(0,160));
+      });
     }
     if(r.status === 404){
       throw new Error('This Gemini model was retired by Google — open Setup and pick "Gemini Flash (auto-latest)"');
@@ -536,18 +541,34 @@ function renderPage(page, longSide){
 }
 /* free, unlimited, on-phone OCR (Tesseract) — makes scans cheap text calls */
 var ocrWorker = null, ocrLoading = null;
+function withTimeout(promise, ms, label){
+  return Promise.race([
+    promise,
+    new Promise(function(_, rej){ setTimeout(function(){ rej(new Error(label)); }, ms); })
+  ]);
+}
+function resetOcr(){
+  try { if(ocrWorker && ocrWorker.terminate) ocrWorker.terminate(); } catch(_){}
+  ocrWorker = null; ocrLoading = null;
+}
 function getOcrWorker(){
   if(ocrWorker) return Promise.resolve(ocrWorker);
   if(ocrLoading) return ocrLoading;
   if(typeof Tesseract === 'undefined') return Promise.reject(new Error('no-ocr'));
-  ocrLoading = Tesseract.createWorker('eng').then(function(w){ ocrWorker = w; return w; });
+  ocrLoading = withTimeout(Tesseract.createWorker('eng'), 30000, 'ocr-load-timeout')
+    .then(function(w){ ocrWorker = w; return w; })
+    .catch(function(e){ ocrLoading = null; throw e; });
   return ocrLoading;
 }
 function ocrText(dataUrl){
-  return getOcrWorker().then(function(w){ return w.recognize(dataUrl); })
-    .then(function(res){
-      return {text:(res.data.text||'').trim(), conf: res.data.confidence||0};
-    });
+  return getOcrWorker().then(function(w){
+    return withTimeout(w.recognize(dataUrl), 75000, 'ocr-timeout');
+  }).then(function(res){
+    return {text:(res.data.text||'').trim(), conf: res.data.confidence||0};
+  }).catch(function(e){
+    if(e && (e.message === 'ocr-timeout' || e.message === 'ocr-load-timeout')) resetOcr();
+    throw e;
+  });
 }
 /* one extraction incl. auto-continuation when output got truncated */
 function extractContent(content, pageNo, override){
@@ -555,6 +576,24 @@ function extractContent(content, pageNo, override){
     runCost.i += resp.inTok; runCost.o += resp.outTok;
     var data = parseArticleJson(resp.text) || {source:'', articles:[]};
     data.articles = data.articles || [];
+    if(!data.articles.length){
+      var totalTxt = content.filter(function(b){return b.type==='text';})
+                            .map(function(b){return b.text;}).join('');
+      data._raw = (resp.text||'').slice(0,140);
+      if(totalTxt.length > 3000){
+        tick('p.' + pageNo + ' — model returned none for a full page, nudging once…');
+        var follow2 = content.concat([{type:'text', text:
+          'Your previous reply contained zero articles. That is incorrect — this page clearly contains editorial/opinion content. Extract every article now, strictly following the rules, and return the JSON.'}]);
+        return claudeWithRetry(follow2, null, 0, override).then(function(r2){
+          runCost.i += r2.inTok; runCost.o += r2.outTok;
+          var d2 = parseArticleJson(r2.text);
+          if(d2 && d2.articles && d2.articles.length) return d2;
+          data._raw = (r2.text||resp.text||'').slice(0,140);
+          return data;
+        }).catch(function(){ return data; });
+      }
+      return data;
+    }
     if(resp.cut && data.articles.length){
       tick('p.' + pageNo + ' — long page, fetching the remaining articles…');
       var heads = data.articles.map(function(a){return a.headline||'';}).filter(Boolean);
@@ -627,7 +666,8 @@ function processPdf(file){
             prep.push({pageNo:pageNo, kind:'text', text:txt});
             return;
           }
-          return renderPage(page, 3000).then(function(big){
+          tick('p.' + pageNo + ' — OCR running (up to ~1 min on big scans)…');
+          return renderPage(page, 2200).then(function(big){
             return ocrText(big.dataUrl).then(function(ocr){
               if(ocr.text.length >= 800 && ocr.conf >= 50){
                 tick('p.' + pageNo + ' — OCR ✓ (conf ' + Math.round(ocr.conf) + ', ' + ocr.text.length + ' ch)');
@@ -720,6 +760,23 @@ function processPdf(file){
             });
             tick('p.' + pageNo + ' ✓ <b>' + n + '</b> piece(s)' +
                  (data.source ? ' — ' + esc(data.source) : ''));
+            if(n === 0){
+              if(data._raw) tick('p.' + pageNo + ' ⚠ model said: “' + esc(data._raw) + '…”');
+              if(p.kind !== 'vision' && p.text && p.text.length > 3000){
+                RUN.edition.articles.push({
+                  h: 'Page ' + pageNo + ' — raw text (model gave none)',
+                  kick: 'RAW · UNFORMATTED',
+                  by: '',
+                  body: p.text,
+                  cont: '',
+                  src: 'Raw local read',
+                  page: pageNo,
+                  read: false
+                });
+                articleCount++;
+                tick('p.' + pageNo + ' 📄 saved raw local text anyway');
+              }
+            }
           }).catch(function(e){
             if(transient(e) && !requeued[pageNo]){
               requeued[pageNo] = true;
