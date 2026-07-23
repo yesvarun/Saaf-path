@@ -1,0 +1,1078 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#171512">
+<title>ਅਖ਼ਬਾਰ · Akhbaar — Full Newspaper Reader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Source+Serif+4:opsz,ital,wght@8..60,0,400;8..60,0,600;8..60,1,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<style>
+:root{
+  --ink:#171512; --paper:#F7F3E9; --paper-2:#EFE9DA; --rule:#D8D0BC;
+  --press:#9E1B1B; --press-2:#C9403A; --muted:#6E6656;
+  --ui:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --disp:"Fraunces",Georgia,serif;
+  --read:"Source Serif 4",Georgia,"Noto Serif",serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{height:100%}
+body{font-family:var(--ui);background:var(--paper);color:var(--ink);min-height:100%;
+  padding-bottom:env(safe-area-inset-bottom)}
+button{font-family:inherit;border:none;background:none;color:inherit;cursor:pointer}
+input,select{font-family:inherit}
+.hide{display:none!important}
+
+/* ---------- masthead ---------- */
+header.mast{padding:calc(14px + env(safe-area-inset-top)) 18px 10px;border-bottom:3px double var(--ink);
+  display:flex;align-items:flex-end;justify-content:space-between;gap:10px}
+.mast h1{font-family:var(--disp);font-weight:700;font-size:26px;letter-spacing:-.01em;line-height:1}
+.mast h1 small{display:block;font-family:var(--ui);font-weight:600;font-size:10px;letter-spacing:.22em;
+  text-transform:uppercase;color:var(--press);margin-top:5px}
+.mast .gear{font-size:13px;font-weight:600;color:var(--muted);border:1px solid var(--rule);
+  border-radius:999px;padding:7px 12px;background:#fff8}
+.dateline{padding:7px 18px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);
+  border-bottom:1px solid var(--rule);display:flex;justify-content:space-between}
+
+/* ---------- library ---------- */
+.wrap{padding:16px 18px 40px;max-width:720px;margin:0 auto}
+.drop{margin-top:6px;border:2px dashed var(--rule);border-radius:14px;background:#fff7;
+  padding:26px 18px;text-align:center}
+.drop .big{font-family:var(--disp);font-weight:600;font-size:19px}
+.drop p{color:var(--muted);font-size:13px;margin-top:6px;line-height:1.5}
+.btn{display:inline-block;background:var(--press);color:#FBF6EA;font-weight:700;font-size:15px;
+  padding:13px 22px;border-radius:999px;margin-top:14px;box-shadow:0 2px 0 #6d1010}
+.btn:active{transform:translateY(1px);box-shadow:none}
+.btn.ghost{background:transparent;color:var(--press);box-shadow:none;border:1.5px solid var(--press)}
+.sec-label{margin:26px 0 8px;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--muted);display:flex;align-items:center;gap:10px}
+.sec-label::after{content:"";flex:1;height:1px;background:var(--rule)}
+.edition{background:#fff9;border:1px solid var(--rule);border-radius:12px;padding:14px 14px 12px;
+  margin-bottom:10px;display:flex;gap:12px;align-items:center}
+.edition .folio{font-family:var(--disp);font-weight:700;font-size:20px;color:var(--press);min-width:44px;
+  text-align:center;border-right:1px solid var(--rule);padding-right:12px;line-height:1.1}
+.edition .folio span{display:block;font-family:var(--ui);font-size:9px;letter-spacing:.15em;color:var(--muted);font-weight:600}
+.edition .meta{flex:1;min-width:0}
+.edition .meta b{font-size:15px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.edition .meta i{font-style:normal;color:var(--muted);font-size:12px}
+.edition .del{color:var(--muted);font-size:18px;padding:8px}
+.empty{color:var(--muted);font-size:13px;padding:8px 2px}
+
+/* ---------- processing ---------- */
+.proc{max-width:720px;margin:0 auto;padding:26px 18px 40px;text-align:center}
+.pressbar{height:14px;border:1.5px solid var(--ink);border-radius:999px;overflow:hidden;background:#fff8;margin:18px 0 8px}
+.pressbar i{display:block;height:100%;width:0%;background:repeating-linear-gradient(45deg,var(--press),var(--press) 8px,var(--press-2) 8px,var(--press-2) 16px);transition:width .4s}
+.proc .stat{font-family:var(--disp);font-weight:600;font-size:20px;margin-top:14px}
+.proc .sub{color:var(--muted);font-size:13px;margin-top:6px;line-height:1.6}
+.ticker{margin-top:18px;text-align:left;background:#fff8;border:1px solid var(--rule);border-radius:12px;
+  padding:12px 14px;font-size:12.5px;color:var(--muted);max-height:180px;overflow:auto;line-height:1.7}
+.ticker b{color:var(--ink)}
+.costline{margin-top:14px;font-size:12px;color:var(--muted)}
+.costline b{color:var(--press)}
+
+/* ---------- article index ---------- */
+.idxhead{padding:12px 18px;border-bottom:1px solid var(--rule);display:flex;gap:10px;align-items:center;
+  position:sticky;top:0;background:var(--paper);z-index:5}
+.idxhead .back{font-size:22px;line-height:1;padding:4px 8px 4px 0}
+.idxhead .t{flex:1;min-width:0}
+.idxhead .t b{display:block;font-family:var(--disp);font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.idxhead .t i{font-style:normal;font-size:11px;color:var(--muted)}
+.search{padding:10px 18px 4px}
+.search input{width:100%;padding:11px 14px;border-radius:999px;border:1px solid var(--rule);
+  background:#fff9;font-size:14px;outline:none}
+.srcgrp{margin-top:18px}
+.srcgrp h3{padding:0 18px;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--press);display:flex;align-items:center;gap:10px}
+.srcgrp h3::after{content:"";flex:1;height:2px;background:var(--ink);opacity:.85}
+.art{display:block;width:100%;text-align:left;padding:13px 18px;border-bottom:1px solid var(--rule)}
+.art .kick{font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--press);margin-bottom:3px}
+.art h4{font-family:var(--disp);font-weight:600;font-size:16.5px;line-height:1.28}
+.art .by{margin-top:4px;font-size:12px;color:var(--muted);display:flex;gap:8px;align-items:center}
+.art.read h4{color:var(--muted);font-weight:500}
+.art.read .kick{color:var(--muted)}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--press);display:inline-block}
+.art.read .dot{background:transparent;border:1px solid var(--rule)}
+
+/* ---------- reader ---------- */
+#reader{position:fixed;inset:0;z-index:20;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  background:var(--r-bg,#FDFBF4);color:var(--r-ink,#1D1A15)}
+.rtop{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;
+  padding:calc(10px + env(safe-area-inset-top)) 14px 10px;background:var(--r-bg,#FDFBF4);
+  border-bottom:1px solid var(--r-rule,#E4DECC);z-index:2}
+.rtop button{font-size:14px;font-weight:700;padding:6px 10px;color:var(--r-mut,#7A7160)}
+.rtop .aa{font-family:var(--disp);font-size:16px;border:1px solid var(--r-rule,#E4DECC);border-radius:999px;padding:5px 14px}
+.rbody{max-width:640px;margin:0 auto;padding:26px 22px 30px}
+.rbody .kick{font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--press-2);margin-bottom:10px}
+.rbody h2{font-family:var(--disp);font-weight:700;font-size:calc(var(--fs,19px)*1.45);line-height:1.22;letter-spacing:-.01em}
+.rbody .by{margin:14px 0 0;font-size:13px;color:var(--r-mut,#7A7160);font-weight:600}
+.rbody .srcline{margin-top:4px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--r-mut,#7A7160)}
+.rbody hr{border:none;border-top:3px double var(--r-rule,#E4DECC);margin:18px 0 22px}
+.prose{font-family:var(--read);font-size:var(--fs,19px);line-height:var(--lh,1.72)}
+.prose.sans{font-family:var(--ui)}
+.prose.just p{text-align:justify;hyphens:auto;-webkit-hyphens:auto}
+.prose p{margin-bottom:1.05em}
+.prose p:first-child::first-letter{font-family:var(--disp);font-weight:700;font-size:3.1em;float:left;
+  line-height:.82;padding:.06em .1em 0 0;color:var(--press-2)}
+.rnav{display:flex;gap:10px;max-width:640px;margin:0 auto;padding:0 22px 40px}
+.rnav button{flex:1;border:1.5px solid var(--r-rule,#E4DECC);border-radius:12px;padding:13px 10px;
+  text-align:left;color:inherit}
+.rnav button b{display:block;font-size:10px;letter-spacing:.15em;text-transform:uppercase;color:var(--r-mut,#7A7160);margin-bottom:4px}
+.rnav button span{font-family:var(--disp);font-size:13.5px;line-height:1.3;display:block}
+.rnav button:disabled{opacity:.35}
+
+/* Aa panel */
+#aaPanel{position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--r-bg,#FDFBF4);color:var(--r-ink,#1D1A15);
+  border-top:1px solid var(--r-rule,#E4DECC);border-radius:18px 18px 0 0;padding:16px 18px calc(20px + env(safe-area-inset-bottom));
+  box-shadow:0 -12px 40px #0003;transform:translateY(105%);transition:transform .25s}
+#aaPanel.open{transform:none}
+.aa-row{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.aa-row label{font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--r-mut,#7A7160);width:64px}
+.aa-row input[type=range]{flex:1;accent-color:var(--press-2)}
+.seg{display:flex;flex:1;border:1.5px solid var(--r-rule,#E4DECC);border-radius:999px;overflow:hidden}
+.seg button{flex:1;padding:9px 4px;font-size:13px;font-weight:600;color:var(--r-mut,#7A7160)}
+.seg button.on{background:var(--press);color:#FBF6EA}
+.swatches{display:flex;gap:10px;flex:1}
+.sw{flex:1;height:42px;border-radius:10px;border:2px solid transparent;font-family:var(--read);font-size:15px}
+.sw.on{border-color:var(--press-2)}
+.sw[data-th=paper]{background:#FDFBF4;color:#1D1A15}
+.sw[data-th=sepia]{background:#F3E5C8;color:#46351D}
+.sw[data-th=slate]{background:#191C21;color:#D8D4CA}
+.sw[data-th=black]{background:#000;color:#B9B5AC}
+.scrim{position:fixed;inset:0;z-index:25;background:#0005}
+
+/* ---------- settings ---------- */
+.modal{position:fixed;inset:0;z-index:40;background:#000a;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--paper);width:100%;max-width:560px;border-radius:18px 18px 0 0;
+  padding:20px 20px calc(24px + env(safe-area-inset-bottom));max-height:88vh;overflow:auto}
+.sheet h2{font-family:var(--disp);font-size:20px;margin-bottom:4px}
+.sheet .note{font-size:12.5px;color:var(--muted);line-height:1.6;margin-bottom:14px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.field input,.field select{width:100%;padding:12px 13px;border:1px solid var(--rule);border-radius:10px;background:#fff;font-size:14px}
+.warn{background:#FBEFEA;border:1px solid #E7C4B8;color:#7c2d12;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.55;margin-bottom:14px}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--ink);color:var(--paper);
+  padding:11px 18px;border-radius:999px;font-size:13px;z-index:60;box-shadow:0 8px 30px #0006}
+</style>
+</head>
+<body>
+
+<!-- ================= HOME / LIBRARY ================= -->
+<div id="vHome">
+  <header class="mast">
+    <h1>ਅਖ਼ਬਾਰ<small>Akhbaar · Full Newspaper Reader</small></h1>
+    <button class="gear" id="btnSettings">⚙ Setup</button>
+  </header>
+  <div class="dateline"><span id="todayLine"></span><span>Rampura Phul · Akhbaar v1</span></div>
+
+  <div class="wrap">
+    <div class="drop">
+      <div class="big">Feed today's full newspaper</div>
+      <p>The whole paper — front page to sport. Ads, tenders, crosswords and market tables are skipped automatically; page-jump stories are stitched back together. Headlines are kept exactly as printed.</p>
+      <button class="btn" id="btnPick">＋ Open PDF</button>
+      <input type="file" id="filePdf" accept="application/pdf" class="hide">
+    </div>
+
+    <div class="sec-label">Your Editions</div>
+    <div id="libList"></div>
+  </div>
+</div>
+
+<!-- ================= PROCESSING ================= -->
+<div id="vProc" class="hide">
+  <header class="mast">
+    <h1>Press Running<small id="procName">—</small></h1>
+    <button class="gear" id="btnCancel">✕ Stop</button>
+  </header>
+  <div class="proc">
+    <div class="pressbar"><i id="barFill"></i></div>
+    <div class="stat" id="procStat">Warming up…</div>
+    <div class="sub" id="procSub">Reading the file</div>
+    <div class="costline">API spend this run ≈ <b id="costNow">$0.00</b> <span id="costInr"></span></div>
+    <div class="ticker" id="ticker"></div>
+    <button class="btn ghost" id="btnFinishEarly" style="margin-top:18px" >Finish & read what's done</button>
+  </div>
+</div>
+
+<!-- ================= ARTICLE INDEX ================= -->
+<div id="vIndex" class="hide">
+  <div class="idxhead">
+    <button class="back" id="btnIdxBack">‹</button>
+    <div class="t"><b id="idxTitle"></b><i id="idxSub"></i></div>
+  </div>
+  <div class="search"><input id="idxSearch" type="search" placeholder="Filter headlines…"></div>
+  <div id="idxList" style="padding-bottom:60px"></div>
+</div>
+
+<!-- ================= READER ================= -->
+<div id="reader" class="hide">
+  <div class="rtop">
+    <button id="btnRdBack">‹ Index</button>
+    <button class="aa" id="btnAa">Aa</button>
+  </div>
+  <div class="rbody">
+    <div class="kick" id="rdKick"></div>
+    <h2 id="rdHead"></h2>
+    <div class="by" id="rdBy"></div>
+    <div class="srcline" id="rdSrc"></div>
+    <hr>
+    <div class="prose" id="rdBody"></div>
+  </div>
+  <div class="rnav">
+    <button id="btnPrev"><b>‹ Previous</b><span id="prevTitle"></span></button>
+    <button id="btnNext"><b>Next ›</b><span id="nextTitle"></span></button>
+  </div>
+</div>
+
+<div class="scrim hide" id="scrim"></div>
+<div id="aaPanel">
+  <div class="aa-row"><label>Size</label><input type="range" id="ctlSize" min="15" max="26" step="1"></div>
+  <div class="aa-row"><label>Spacing</label><input type="range" id="ctlLh" min="1.4" max="2.1" step="0.05"></div>
+  <div class="aa-row"><label>Font</label>
+    <div class="seg">
+      <button data-font="serif" id="fSerif">Serif</button>
+      <button data-font="sans" id="fSans">Sans</button>
+      <button data-font="just" id="fJust">Justify</button>
+    </div>
+  </div>
+  <div class="aa-row"><label>Page</label>
+    <div class="swatches">
+      <button class="sw" data-th="paper">Aa</button>
+      <button class="sw" data-th="sepia">Aa</button>
+      <button class="sw" data-th="slate">Aa</button>
+      <button class="sw" data-th="black">Aa</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= SETTINGS ================= -->
+<div class="modal hide" id="mSettings">
+  <div class="sheet">
+    <h2>Setup</h2>
+    <p class="note">One-time. Key stays only in this phone's browser (localStorage) — never in the file, never uploaded anywhere except directly to Anthropic.</p>
+    <div class="field">
+      <label>Engine</label>
+      <select id="setModel">
+        <option value="gemini-flash-latest">Gemini Flash (auto-latest) — FREE, recommended daily</option>
+        <option value="gemini-3.5-flash">Gemini 3.5 Flash — FREE tier</option>
+        <option value="gemini-3.1-flash-lite">Gemini 3.1 Flash-Lite — FREE, higher daily limit</option>
+        <option value="claude-haiku-4-5">Claude Haiku 4.5 — paid, ~₹40–70 per bundle</option>
+        <option value="claude-sonnet-4-6">Claude Sonnet 4.6 — paid, best quality, ~5×</option>
+      </select>
+    </div>
+    <div class="field" id="fldGKey">
+      <label>Gemini API key(s) — paste 2–3 separated by commas to beat rate limits</label>
+      <input type="password" id="setGKey" placeholder="AIza…, AIza…, AIza…">
+    </div>
+    <div class="field" id="fldAKey">
+      <label>Anthropic API key (only for Claude engines)</label>
+      <input type="password" id="setKey" placeholder="sk-ant-…">
+    </div>
+    <div class="warn">Gemini free tier = ₹0 per PDF (rate-limited to a few pages per minute, so a 40-page bundle takes ~10–15 min — start it, make chai). Claude engines are faster/paid. Processed editions are saved on the phone; reopening never costs anything.</div>
+    <button class="btn" id="btnSaveSet" style="width:100%">Save</button>
+    <button class="btn ghost" id="btnCloseSet" style="width:100%;margin-top:8px">Close</button>
+  </div>
+</div>
+
+<script>
+'use strict';
+/* =========================================================
+   Saaf Path — single-file editorial reader
+   Pipeline: PDF.js → per page (text layer OR page image)
+   → Claude → JSON articles → IndexedDB → reader UI
+   ========================================================= */
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+/* ---------- tiny helpers (declared first: no TDZ) ---------- */
+function $(id){ return document.getElementById(id); }
+function esc(s){ return (s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function toast(msg, ms){
+  var t = document.createElement('div'); t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(function(){ t.remove(); }, ms||2600);
+}
+function show(id){
+  ['vHome','vProc','vIndex','reader'].forEach(function(v){ $(v).classList.add('hide'); });
+  $(id).classList.remove('hide');
+  window.scrollTo(0,0);
+}
+
+/* ---------- persistent settings ---------- */
+var CFG = {
+  key: localStorage.getItem('ak_key') || '',
+  gkey: localStorage.getItem('ak_gkey') || '',
+  model: localStorage.getItem('ak_model') || 'gemini-flash-latest'
+};
+if(CFG.model.indexOf('gemini-2.') === 0){  // 2.x generation retired by Google mid-2026
+  CFG.model = 'gemini-flash-latest';
+  localStorage.setItem('ak_model', CFG.model);
+}
+function isGemini(){ return CFG.model.indexOf('gemini') === 0; }
+var READER = JSON.parse(localStorage.getItem('ak_reader') || '{}');
+READER = Object.assign({size:19, lh:1.72, font:'serif', just:true, theme:'paper'}, READER);
+function saveReader(){ localStorage.setItem('ak_reader', JSON.stringify(READER)); }
+
+/* ---------- IndexedDB ---------- */
+var DB = null;
+function openDB(){
+  return new Promise(function(res, rej){
+    var r = indexedDB.open('akhbaar', 1);
+    r.onupgradeneeded = function(e){
+      e.target.result.createObjectStore('editions', {keyPath:'id'});
+    };
+    r.onsuccess = function(e){ DB = e.target.result; res(); };
+    r.onerror = function(){ rej(r.error); };
+  });
+}
+function dbPut(ed){
+  return new Promise(function(res, rej){
+    var tx = DB.transaction('editions','readwrite');
+    tx.objectStore('editions').put(ed);
+    tx.oncomplete = res; tx.onerror = function(){ rej(tx.error); };
+  });
+}
+function dbAll(){
+  return new Promise(function(res, rej){
+    var out = [];
+    var tx = DB.transaction('editions','readonly');
+    tx.objectStore('editions').openCursor().onsuccess = function(e){
+      var c = e.target.result;
+      if(c){ out.push(c.value); c.continue(); } else res(out);
+    };
+    tx.onerror = function(){ rej(tx.error); };
+  });
+}
+function dbDel(id){
+  return new Promise(function(res){
+    var tx = DB.transaction('editions','readwrite');
+    tx.objectStore('editions').delete(id);
+    tx.oncomplete = res;
+  });
+}
+
+/* ---------- pricing (USD per MTok in/out) ---------- */
+var PRICE = {
+  'gemini-flash-latest':   {i:0, o:0},
+  'gemini-3.5-flash':      {i:0, o:0},
+  'gemini-3.1-flash-lite': {i:0, o:0},
+  'claude-haiku-4-5':  {i:1,  o:5},
+  'claude-sonnet-4-6': {i:3, o:15}
+};
+var runCost = {i:0, o:0};
+function costUsd(){
+  var p = PRICE[CFG.model] || {i:0,o:0};
+  return (runCost.i/1e6)*p.i + (runCost.o/1e6)*p.o;
+}
+function paintCost(){
+  if(isGemini()){
+    $('costNow').textContent = '₹0 (free tier)';
+    $('costInr').textContent = '';
+    return;
+  }
+  var u = costUsd();
+  $('costNow').textContent = '$' + u.toFixed(3);
+  $('costInr').textContent = '(≈ ₹' + Math.round(u*88) + ')';
+}
+
+/* ---------- Claude call (direct browser, key in localStorage) ---------- */
+var EXTRACT_SYS =
+"You convert one page of a daily newspaper (given as raw extracted text, OCR text, or an image) into structured articles for a personal mobile reader. Return ONLY valid JSON, no markdown fences, shaped as:\n" +
+'{"source":"<newspaper name if identifiable, else Unknown>","section":"<page section title as printed, e.g. The World, The City, Region, Economy, Explained, Sport, The Editorial Page, else empty>","articles":[{"headline":"","kicker":"","byline":"","dateline":"","body":"","continuationOf":"","jumpsTo":false}]}\n' +
+"Rules:\n" +
+"1. HEADLINE VERBATIM. Copy each headline exactly as printed — same words, same capitalisation. Never rewrite, shorten, translate or 'improve' it.\n" +
+"2. Include EVERY news item on the page: lead stories, single-column stories, features, interviews, analysis, editorials, op-eds, columns, obituaries, sports reports and archival boxes. A newspaper page is dense — a typical page has 4 to 12 items. Do not stop after the big ones.\n" +
+"3. Short news briefs (often in a narrow rail titled BRIEFLY, IN BRIEF, NEWS IN NUMBERS, or similar): group the whole rail into ONE article, headlined exactly as the rail is titled, with each brief's own mini-headline as a line followed by its text, separated by blank lines. Same for a letters section: ONE article headlined as printed, letters separated by blank lines, signatures kept.\n" +
+"4. SKIP non-editorial furniture entirely — do not create articles for: advertisements of any size (including full-page ads, property/bank/tender/auction notices, public notices, matrimonial and classified columns), crosswords, sudoku, quizzes, horoscopes, comic strips, weather tables, market/stock tables, TV listings, page mastheads, standalone photo captions, and subscription or promo boxes. If a page is entirely advertising, return an empty articles array.\n" +
+"5. body = full article text as printed, paragraphs separated by \\n\\n. Reconstruct correct column reading order — newspaper text runs down one column then to the top of the next, and a story's columns may be interrupted by photos or boxes. Merge words broken by line-end hyphens. Repair missing ligatures common in these PDFs: aected→affected, rst→first, signicant→significant, oer→offer, inuence→influence, ecient→efficient, oce→office, conrmed→confirmed etc. If the input is OCR text it may contain recognition errors — silently correct the obvious ones. Do not summarise, do not omit paragraphs, do not add anything of your own.\n" +
+"6. kicker = small label or strap above the headline if present (EXPRESS SPECIAL, EXPLAINED, DELHI CONFIDENTIAL, a topic strap etc), else empty. byline = reporter name and any 'New Delhi, July 17' style location-date line; put the location-date part in dateline if it is clearly separable, else leave dateline empty.\n" +
+"7. PAGE JUMPS. Newspapers split stories across pages. If a story ends with a jump line such as 'CONTINUED ON PAGE 2' or similar, set jumpsTo true — still return everything printed on THIS page as the body. If a block is instead the tail of a story that began elsewhere (it starts mid-sentence, or sits under a jump header naming the story), set continuationOf to that story's headline as printed in the header, leave headline empty, and put the tail text in body.\n" +
+"8. If the page has no genuine articles, return {\"source\":\"\",\"section\":\"\",\"articles\":[]}.";
+
+function claude(content, maxTok){
+  return fetch('https://api.anthropic.com/v1/messages', {
+    method:'POST',
+    headers:{
+      'content-type':'application/json',
+      'x-api-key': CFG.key,
+      'anthropic-version':'2023-06-01',
+      'anthropic-dangerous-direct-browser-access':'true'
+    },
+    body: JSON.stringify({
+      model: CFG.model,
+      max_tokens: maxTok || 8000,
+      system: EXTRACT_SYS,
+      messages:[{role:'user', content: content}]
+    })
+  }).then(function(r){
+    if(r.status === 429 || r.status === 529) throw {retry:true, status:r.status};
+    if(!r.ok) return r.text().then(function(t){ throw new Error('API '+r.status+': '+t.slice(0,180)); });
+    return r.json();
+  }).then(function(j){
+    return {
+      text: (j.content||[]).filter(function(b){return b.type==='text';})
+              .map(function(b){return b.text;}).join(''),
+      inTok: j.usage ? j.usage.input_tokens||0 : 0,
+      outTok: j.usage ? j.usage.output_tokens||0 : 0,
+      cut: j.stop_reason === 'max_tokens'
+    };
+  });
+}
+var gkRot = 0, gkLast = 0, gkDead = {};
+function gkeys(){
+  return CFG.gkey.split(',').map(function(k){return k.trim();}).filter(Boolean);
+}
+function liveGkeys(){
+  return gkeys().filter(function(k){ return !gkDead[k]; });
+}
+function gemini(content, maxTok, override){
+  var keys = liveGkeys();
+  if(!keys.length) return Promise.reject(new Error('No working Gemini key — check Setup'));
+  var key = keys[gkRot % keys.length]; gkRot++;
+  var model = override || CFG.model;
+  // proactive pacing: keep a minimum gap between calls, shared across keys
+  var gap = Math.max(0, Math.ceil(6500 / keys.length) - (Date.now() - gkLast));
+  return new Promise(function(res){ setTimeout(res, gap); }).then(function(){
+    gkLast = Date.now();
+    var parts = content.map(function(b){
+      if(b.type === 'image') return {inline_data:{mime_type:b.source.media_type, data:b.source.data}};
+      return {text: b.text};
+    });
+    var url = 'https://generativelanguage.googleapis.com/v1beta/models/' +
+              model + ':generateContent?key=' + encodeURIComponent(key);
+    return fetch(url, {
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body: JSON.stringify({
+        system_instruction:{parts:[{text: EXTRACT_SYS}]},
+        contents:[{role:'user', parts: parts}],
+        generationConfig:{maxOutputTokens: maxTok || (model.indexOf('lite') > -1 ? 8192 : 32768), responseMimeType:'application/json'}
+      })
+    });
+  }).then(function(r){
+    if(r.status === 429 || r.status === 503) throw {retry:true, status:r.status};
+    if(r.status === 400 || r.status === 403){
+      return r.text().then(function(t){
+        if(/api key|credential|permission denied/i.test(t)){
+          gkDead[key] = true;
+          tick('🔑 Key ending …' + key.slice(-4) + ' rejected — dropped from rotation');
+          if(liveGkeys().length) throw {retry:true, immediate:true};
+          throw new Error('All Gemini keys rejected — re-check them in Setup');
+        }
+        throw new Error('Gemini ' + r.status + ': ' + t.slice(0,160));
+      });
+    }
+    if(r.status === 404){
+      throw new Error('This Gemini model was retired by Google — open Setup and pick "Gemini Flash (auto-latest)"');
+    }
+    if(!r.ok) return r.text().then(function(t){ throw new Error('Gemini '+r.status+': '+t.slice(0,180)); });
+    return r.json();
+  }).then(function(j){
+    var c = j.candidates && j.candidates[0];
+    var txt = c && c.content && c.content.parts ?
+      c.content.parts.map(function(p){return p.text||'';}).join('') : '';
+    var u = j.usageMetadata || {};
+    return {text: txt, inTok: u.promptTokenCount||0, outTok: u.candidatesTokenCount||0,
+            cut: !!(c && c.finishReason === 'MAX_TOKENS')};
+  });
+}
+function callModel(content, maxTok, override){
+  return isGemini() ? gemini(content, maxTok, override) : claude(content, maxTok);
+}
+function transient(e){
+  return !!(e && (e.retry || e.name === 'TypeError' || /failed to fetch|network/i.test(e.message||'')));
+}
+function claudeWithRetry(content, maxTok, tries, override){
+  tries = tries || 0;
+  return callModel(content, maxTok, override).catch(function(e){
+    if(transient(e) && tries < 5){
+      var wait = (e && e.immediate) ? 300 : (isGemini() ? 5000 : 2500) * Math.pow(1.8, tries);
+      if(!(e && e.immediate)){
+        tick(e && e.retry ? '⏳ Rate-limited, waiting ' + Math.round(wait/1000) + 's…'
+                          : '📶 Network dropped, retrying in ' + Math.round(wait/1000) + 's…');
+      }
+      return new Promise(function(res){ setTimeout(res, wait); })
+        .then(function(){ return claudeWithRetry(content, maxTok, tries+1, override); });
+    }
+    throw e;
+  });
+}
+function parseArticleJson(raw){
+  var s = (raw||'').trim().replace(/^```json\s*/i,'').replace(/^```\s*/,'').replace(/```\s*$/,'');
+  try { return JSON.parse(s); } catch(e){}
+  // salvage: cut back to last complete article object, close the JSON
+  var cut = s.lastIndexOf('},');
+  if(cut > -1){
+    try { return JSON.parse(s.slice(0, cut+1) + ']}'); } catch(e){}
+  }
+  var start = s.indexOf('{');
+  if(start > -1){ try { return JSON.parse(s.slice(start)); } catch(e){} }
+  return null;
+}
+
+/* ---------- PDF page → text or image ---------- */
+function pageText(page){
+  return page.getTextContent().then(function(tc){
+    var out = '', lastY = null;
+    tc.items.forEach(function(it){
+      if(!it.str) return;
+      var y = it.transform ? it.transform[5] : 0;
+      if(lastY !== null && Math.abs(y - lastY) > 4) out += '\n';
+      else if(out && !out.endsWith('\n')) out += ' ';
+      out += it.str;
+      lastY = y;
+    });
+    return out.trim();
+  });
+}
+function renderPage(page, longSide){
+  var vp1 = page.getViewport({scale:1});
+  var scale = Math.min((longSide || 1800) / Math.max(vp1.width, vp1.height), 4);
+  var vp = page.getViewport({scale: scale});
+  var cv = document.createElement('canvas');
+  cv.width = Math.floor(vp.width); cv.height = Math.floor(vp.height);
+  var ctx = cv.getContext('2d');
+  return page.render({canvasContext:ctx, viewport:vp}).promise.then(function(){
+    var dataUrl = cv.toDataURL('image/jpeg', 0.78);
+    cv.width = cv.height = 0;
+    return {dataUrl: dataUrl, b64: dataUrl.split(',')[1]};
+  });
+}
+/* free, unlimited, on-phone OCR (Tesseract) — makes scans cheap text calls */
+var ocrWorker = null, ocrLoading = null;
+function withTimeout(promise, ms, label){
+  return Promise.race([
+    promise,
+    new Promise(function(_, rej){ setTimeout(function(){ rej(new Error(label)); }, ms); })
+  ]);
+}
+function resetOcr(){
+  try { if(ocrWorker && ocrWorker.terminate) ocrWorker.terminate(); } catch(_){}
+  ocrWorker = null; ocrLoading = null;
+}
+function getOcrWorker(){
+  if(ocrWorker) return Promise.resolve(ocrWorker);
+  if(ocrLoading) return ocrLoading;
+  if(typeof Tesseract === 'undefined') return Promise.reject(new Error('no-ocr'));
+  ocrLoading = withTimeout(Tesseract.createWorker('eng'), 30000, 'ocr-load-timeout')
+    .then(function(w){ ocrWorker = w; return w; })
+    .catch(function(e){ ocrLoading = null; throw e; });
+  return ocrLoading;
+}
+function ocrText(dataUrl){
+  return getOcrWorker().then(function(w){
+    return withTimeout(w.recognize(dataUrl), 75000, 'ocr-timeout');
+  }).then(function(res){
+    return {text:(res.data.text||'').trim(), conf: res.data.confidence||0};
+  }).catch(function(e){
+    if(e && (e.message === 'ocr-timeout' || e.message === 'ocr-load-timeout')) resetOcr();
+    throw e;
+  });
+}
+/* one extraction incl. auto-continuation when output got truncated */
+function extractContent(content, pageNo, override){
+  return claudeWithRetry(content, null, 0, override).then(function(resp){
+    runCost.i += resp.inTok; runCost.o += resp.outTok;
+    var data = parseArticleJson(resp.text) || {source:'', articles:[]};
+    data.articles = data.articles || [];
+    if(!data.articles.length){
+      var totalTxt = content.filter(function(b){return b.type==='text';})
+                            .map(function(b){return b.text;}).join('');
+      data._raw = (resp.text||'').slice(0,140);
+      if(totalTxt.length > 3000){
+        tick('p.' + pageNo + ' — model returned none for a full page, nudging once…');
+        var follow2 = content.concat([{type:'text', text:
+          'Your previous reply contained zero articles. That is incorrect — this page clearly contains news articles. Extract every article now, strictly following the rules, and return the JSON.'}]);
+        return claudeWithRetry(follow2, null, 0, override).then(function(r2){
+          runCost.i += r2.inTok; runCost.o += r2.outTok;
+          var d2 = parseArticleJson(r2.text);
+          if(d2 && d2.articles && d2.articles.length) return d2;
+          data._raw = (r2.text||resp.text||'').slice(0,140);
+          return data;
+        }).catch(function(){ return data; });
+      }
+      return data;
+    }
+    if(resp.cut && data.articles.length){
+      tick('p.' + pageNo + ' — long page, fetching the remaining articles…');
+      var heads = data.articles.map(function(a){return a.headline||'';}).filter(Boolean);
+      var follow = content.concat([{type:'text', text:
+        'Your previous output was cut off. You already returned these articles: ' +
+        JSON.stringify(heads) +
+        '. Now return ONLY the remaining articles from this same page, same JSON schema. ' +
+        'If none remain, return {"source":"","articles":[]}.'}]);
+      return claudeWithRetry(follow, null, 0, override).then(function(r2){
+        runCost.i += r2.inTok; runCost.o += r2.outTok;
+        var d2 = parseArticleJson(r2.text);
+        if(d2 && d2.articles) data.articles = data.articles.concat(d2.articles);
+        return data;
+      }).catch(function(){ return data; });
+    }
+    return data;
+  });
+}
+
+/* ---------- processing run ---------- */
+var RUN = { cancel:false, edition:null };
+function tick(html){
+  var t = $('ticker');
+  t.insertAdjacentHTML('afterbegin', '<div>' + html + '</div>');
+  while(t.children.length > 60) t.lastChild.remove();
+}
+
+function processPdf(file){
+  if(isGemini() ? !CFG.gkey : !CFG.key){
+    openSettings();
+    toast(isGemini() ? 'Add your free Gemini key first' : 'Add your Anthropic key first');
+    return;
+  }
+  runCost = {i:0, o:0}; paintCost();
+  RUN.cancel = false;
+  var id = Date.now().toString(36);
+  RUN.edition = {
+    id: id,
+    name: file.name.replace(/\.pdf$/i,''),
+    createdAt: Date.now(),
+    pages: 0,
+    done: 0,
+    articles: [],
+    cost: 0
+  };
+  $('procName').textContent = RUN.edition.name;
+  $('procStat').textContent = 'Opening PDF…';
+  $('procSub').textContent = '';
+  $('ticker').innerHTML = '';
+  $('barFill').style.width = '0%';
+  show('vProc');
+
+  file.arrayBuffer().then(function(buf){
+    return pdfjsLib.getDocument({data:buf}).promise;
+  }).then(function(pdf){
+    RUN.edition.pages = pdf.numPages;
+    tick('<b>' + pdf.numPages + ' pages</b> found. Stage 1: reading every page locally (no API, no limits). Stage 2: AI typesetting at quota pace.');
+
+    /* ---------- STAGE 1 : local read — text layer or on-phone OCR ---------- */
+    var prep = [];
+    function stage1(pageNo){
+      if(RUN.cancel || pageNo > pdf.numPages) return Promise.resolve();
+      $('procStat').textContent = 'Stage 1 · reading page ' + pageNo + ' / ' + pdf.numPages;
+      $('procSub').textContent = 'Local text + OCR — free, unlimited';
+      $('barFill').style.width = Math.round(30 * pageNo / pdf.numPages) + '%';
+      return pdf.getPage(pageNo).then(function(page){
+        return pageText(page).then(function(txt){
+          if(txt.length >= 600){
+            tick('p.' + pageNo + ' — text layer (' + txt.length + ' ch)');
+            prep.push({pageNo:pageNo, kind:'text', text:txt});
+            return;
+          }
+          tick('p.' + pageNo + ' — OCR running (up to ~1 min on big scans)…');
+          return renderPage(page, 2200).then(function(big){
+            return ocrText(big.dataUrl).then(function(ocr){
+              if(ocr.text.length >= 800 && ocr.conf >= 50){
+                tick('p.' + pageNo + ' — OCR ✓ (conf ' + Math.round(ocr.conf) + ', ' + ocr.text.length + ' ch)');
+                prep.push({pageNo:pageNo, kind:'ocr', text:ocr.text});
+                return;
+              }
+              tick('p.' + pageNo + ' — OCR weak (conf ' + Math.round(ocr.conf) + ') → will need vision');
+              return renderPage(page, 1800).then(function(img){
+                prep.push({pageNo:pageNo, kind:'vision', b64:img.b64});
+              });
+            }).catch(function(){
+              tick('p.' + pageNo + ' — OCR unavailable → will need vision');
+              return renderPage(page, 1800).then(function(img){
+                prep.push({pageNo:pageNo, kind:'vision', b64:img.b64});
+              });
+            });
+          });
+        });
+      }).catch(function(e){
+        tick('p.' + pageNo + ' ✗ local read failed: ' + esc(e.message||''));
+      }).then(function(){ return stage1(pageNo + 1); });
+    }
+
+    return stage1(1).then(function(){
+      if(RUN.cancel) return;
+      var nT = prep.filter(function(p){return p.kind==='text';}).length;
+      var nO = prep.filter(function(p){return p.kind==='ocr';}).length;
+      var nV = prep.filter(function(p){return p.kind==='vision';}).length;
+      tick('<b>Stage 1 done.</b> ' + nT + ' text · ' + nO + ' OCR · ' + nV + ' vision. Sending to AI…');
+      var planStr = nT + ' text · ' + nO + ' OCR · ' + nV + ' vision';
+
+      /* ---------- STAGE 2 : AI typesetting at quota pace ---------- */
+      var queue = prep.slice();
+      var CONC = isGemini() ? (gkeys().length >= 3 ? 2 : 1) : 2, active = 0, articleCount = 0;
+      var requeued = {};
+      var sessionOverride = null, anySuccess = false;
+
+      return new Promise(function(resolve){
+        function maybeDone(){
+          if((queue.length === 0 && active === 0) || RUN.cancel) resolve();
+        }
+        function paint(){
+          var pct = 30 + Math.round(70 * RUN.edition.done / RUN.edition.pages);
+          $('barFill').style.width = pct + '%';
+          $('procStat').textContent = 'Stage 2 · page ' + RUN.edition.done + ' / ' + RUN.edition.pages;
+          $('procSub').textContent = articleCount + ' articles set in type · local read: ' + planStr;
+          paintCost();
+        }
+        function contentFor(p){
+          if(p.kind === 'vision'){
+            return [
+              {type:'image', source:{type:'base64', media_type:'image/jpeg', data:p.b64}},
+              {type:'text', text:'This is page ' + p.pageNo + ' of a daily newspaper. Extract per the rules.'}
+            ];
+          }
+          if(p.kind === 'ocr'){
+            return [{type:'text',
+              text:'PAGE ' + p.pageNo + ' OCR TEXT (may contain OCR errors — silently correct them):\n\n' + p.text}];
+          }
+          return [{type:'text', text:'PAGE ' + p.pageNo + ' RAW TEXT:\n\n' + p.text}];
+        }
+        function next(){
+          if(RUN.cancel){ maybeDone(); return; }
+          if(queue.length === 0){ maybeDone(); return; }
+          if(active >= CONC) return;
+          var p = queue.shift();
+          var pageNo = p.pageNo;
+          var postponed = false;
+          active++;
+          var override = sessionOverride ||
+            ((requeued[pageNo] && isGemini() && CFG.model !== 'gemini-3.1-flash-lite')
+              ? 'gemini-3.1-flash-lite' : undefined);
+          if(override && !sessionOverride) tick('p.' + pageNo + ' — retrying on Flash-Lite (separate free quota)');
+          extractContent(contentFor(p), pageNo, override).then(function(data){
+            anySuccess = true;
+            var n = 0;
+            (data.articles||[]).forEach(function(a){
+              if(!a.body || !a.body.trim()) return;
+              RUN.edition.articles.push({
+                h: (a.headline||'').trim(),
+                kick: (a.kicker||'').trim(),
+                by: (a.byline||'').trim(),
+                dl: (a.dateline||'').trim(),
+                body: a.body.trim(),
+                cont: (a.continuationOf||'').trim(),
+                jumps: !!a.jumpsTo,
+                src: (data.source||'').trim() || 'Unknown',
+                sec: (data.section||'').trim() || 'General',
+                page: pageNo,
+                read: false
+              });
+              if(a.headline){ articleCount++; n++; }
+            });
+            tick('p.' + pageNo + ' ✓ <b>' + n + '</b> piece(s)' +
+                 (data.source ? ' — ' + esc(data.source) : ''));
+            if(n === 0){
+              if(data._raw) tick('p.' + pageNo + ' ⚠ model said: “' + esc(data._raw) + '…”');
+              if(p.kind !== 'vision' && p.text && p.text.length > 3000){
+                RUN.edition.articles.push({
+                  h: 'Page ' + pageNo + ' — raw text (model gave none)',
+                  kick: 'RAW · UNFORMATTED',
+                  by: '',
+                  body: p.text,
+                  cont: '',
+                  src: 'Raw local read',
+                  page: pageNo,
+                  read: false
+                });
+                articleCount++;
+                tick('p.' + pageNo + ' 📄 saved raw local text anyway');
+              }
+            }
+          }).catch(function(e){
+            if(transient(e) && !requeued[pageNo]){
+              requeued[pageNo] = true;
+              queue.push(p);
+              tick('p.' + pageNo + ' ⏸ still limited — postponed to end of queue');
+              postponed = true;
+              if(!anySuccess && !sessionOverride && isGemini() && CFG.model !== 'gemini-3.1-flash-lite'){
+                sessionOverride = 'gemini-3.1-flash-lite';
+                tick('🚨 <b>Primary quota looks exhausted</b> — switching the whole run to Flash-Lite (separate free bucket)');
+              }
+            } else {
+              tick('p.' + pageNo + ' ✗ ' + esc(e.message || 'rate limit persisted'));
+              if(p.kind !== 'vision' && p.text){
+                RUN.edition.articles.push({
+                  h: 'Page ' + pageNo + ' — raw text (AI unavailable)',
+                  kick: 'RAW · UNFORMATTED',
+                  by: '',
+                  body: p.text,
+                  cont: '',
+                  src: 'Raw local read',
+                  page: pageNo,
+                  read: false
+                });
+                articleCount++;
+                tick('p.' + pageNo + ' 📄 saved raw local text so you can still read it');
+              }
+            }
+          }).then(function(){
+            active--;
+            if(!postponed) RUN.edition.done++;
+            paint();
+            next(); maybeDone();
+          });
+        }
+        next(); next();
+      });
+    });
+  }).then(function(){
+    finishRun();
+  }).catch(function(e){
+    toast('Could not open PDF: ' + (e.message||e));
+    show('vHome');
+  });
+}
+
+function finishRun(){
+  var ed = RUN.edition;
+  if(!ed) return;
+  // stitch page-jump continuations onto their parent stories
+  var parents = ed.articles.filter(function(a){ return a.h; });
+  function norm(s){ return (s||'').toLowerCase().replace(/[^a-z0-9 ]/g,'').replace(/\s+/g,' ').trim(); }
+  ed.articles.filter(function(a){ return !a.h && a.cont; }).forEach(function(c){
+    var key = norm(c.cont);
+    var hit = null, best = 0;
+    parents.forEach(function(p){
+      var ph = norm(p.h);
+      if(!ph || !key) return;
+      var score = 0;
+      if(key.indexOf(ph) > -1 || ph.indexOf(key) > -1) score = 100;
+      else {
+        var kw = key.split(' ').filter(function(w){ return w.length > 3; });
+        var hits = kw.filter(function(w){ return ph.indexOf(w) > -1; }).length;
+        score = kw.length ? (hits / kw.length) * 100 : 0;
+      }
+      // prefer a parent that actually flagged a jump, and an earlier page
+      if(p.jumps) score += 12;
+      if(p.page < c.page) score += 8;
+      if(score > best){ best = score; hit = p; }
+    });
+    if(hit && best >= 55){ hit.body += '\n\n' + c.body; hit.stitched = true; }
+    else { c.h = c.cont ? '(continued) ' + c.cont : 'Continuation from another page'; }
+  });
+  ed.articles = ed.articles.filter(function(a){ return a.h; });
+  ed.articles.sort(function(a,b){ return a.page - b.page; });
+  ed.cost = costUsd();
+  dbPut(ed).then(function(){
+    toast(ed.articles.length + ' articles ready');
+    openEdition(ed);
+  });
+}
+
+/* ---------- library ---------- */
+function paintLibrary(){
+  dbAll().then(function(eds){
+    eds.sort(function(a,b){ return b.createdAt - a.createdAt; });
+    var box = $('libList');
+    if(!eds.length){
+      box.innerHTML = '<div class="empty">Nothing on the rack yet. Feed a PDF above — it stays saved here afterwards, free to reopen.</div>';
+      return;
+    }
+    box.innerHTML = '';
+    eds.forEach(function(ed){
+      var d = new Date(ed.createdAt);
+      var unread = ed.articles.filter(function(a){ return !a.read; }).length;
+      var el = document.createElement('div');
+      el.className = 'edition';
+      el.innerHTML =
+        '<div class="folio">' + ed.articles.length + '<span>PIECES</span></div>' +
+        '<div class="meta"><b>' + esc(ed.name) + '</b>' +
+        '<i>' + d.toLocaleDateString('en-IN',{day:'numeric',month:'short'}) +
+        ' · ' + ed.pages + ' pp · ' + unread + ' unread</i></div>' +
+        '<button class="del" aria-label="Delete">🗑</button>';
+      el.querySelector('.meta').onclick = function(){ openEdition(ed); };
+      el.querySelector('.folio').onclick = function(){ openEdition(ed); };
+      el.querySelector('.del').onclick = function(){
+        if(confirm('Delete "' + ed.name + '"?')) dbDel(ed.id).then(paintLibrary);
+      };
+      box.appendChild(el);
+    });
+  });
+}
+
+/* ---------- article index ---------- */
+var CUR = { ed:null, idx:-1, order:[] };
+function openEdition(ed){
+  CUR.ed = ed;
+  $('idxTitle').textContent = ed.name;
+  $('idxSub').textContent = ed.articles.length + ' articles · ' + ed.pages + ' pages';
+  $('idxSearch').value = '';
+  paintIndex('');
+  show('vIndex');
+}
+function paintIndex(filter){
+  var list = $('idxList');
+  list.innerHTML = '';
+  var f = (filter||'').toLowerCase();
+  var bySec = {}, order = [];
+  CUR.ed.articles.forEach(function(a, i){
+    if(f && a.h.toLowerCase().indexOf(f) === -1 &&
+            (a.by||'').toLowerCase().indexOf(f) === -1 &&
+            (a.sec||'').toLowerCase().indexOf(f) === -1) return;
+    var key = a.sec || 'General';
+    if(!bySec[key]){ bySec[key] = []; order.push(key); }
+    bySec[key].push(i);
+  });
+  CUR.order = [];
+  order.forEach(function(sec){
+    var grp = document.createElement('div');
+    grp.className = 'srcgrp';
+    grp.innerHTML = '<h3>' + esc(sec) + '</h3>';
+    bySec[sec].forEach(function(i){
+      CUR.order.push(i);
+      var a = CUR.ed.articles[i];
+      var b = document.createElement('button');
+      b.className = 'art' + (a.read ? ' read' : '');
+      var meta = a.by || a.dl || ('p. ' + a.page);
+      b.innerHTML =
+        (a.kick ? '<div class="kick">' + esc(a.kick) + '</div>' : '') +
+        '<h4>' + esc(a.h) + '</h4>' +
+        '<div class="by"><span class="dot"></span>' + esc(meta) + '</div>';
+      b.onclick = function(){ openArticle(i); };
+      grp.appendChild(b);
+    });
+    list.appendChild(grp);
+  });
+  if(!CUR.order.length){
+    list.innerHTML = '<div class="empty" style="padding:20px 18px">No matching headlines.</div>';
+  }
+}
+
+/* ---------- reader ---------- */
+var THEMES = {
+  paper:{bg:'#FDFBF4', ink:'#1D1A15', rule:'#E4DECC', mut:'#7A7160', bar:'#FDFBF4'},
+  sepia:{bg:'#F3E5C8', ink:'#46351D', rule:'#DCC9A4', mut:'#8A7350', bar:'#F3E5C8'},
+  slate:{bg:'#191C21', ink:'#D8D4CA', rule:'#31353D', mut:'#8B8F98', bar:'#191C21'},
+  black:{bg:'#000000', ink:'#B9B5AC', rule:'#242424', mut:'#6F6C66', bar:'#000000'}
+};
+function applyReader(){
+  var t = THEMES[READER.theme] || THEMES.paper;
+  var r = $('reader');
+  r.style.setProperty('--r-bg', t.bg);
+  r.style.setProperty('--r-ink', t.ink);
+  r.style.setProperty('--r-rule', t.rule);
+  r.style.setProperty('--r-mut', t.mut);
+  r.style.setProperty('--fs', READER.size + 'px');
+  r.style.setProperty('--lh', READER.lh);
+  var aa = $('aaPanel');
+  aa.style.setProperty('--r-bg', t.bg);
+  aa.style.setProperty('--r-ink', t.ink);
+  aa.style.setProperty('--r-rule', t.rule);
+  aa.style.setProperty('--r-mut', t.mut);
+  aa.style.color = t.ink;
+  document.querySelector('meta[name=theme-color]').content = t.bar;
+  var prose = $('rdBody');
+  prose.classList.toggle('sans', READER.font === 'sans');
+  prose.classList.toggle('just', !!READER.just);
+  $('ctlSize').value = READER.size;
+  $('ctlLh').value = READER.lh;
+  $('fSerif').classList.toggle('on', READER.font === 'serif');
+  $('fSans').classList.toggle('on', READER.font === 'sans');
+  $('fJust').classList.toggle('on', !!READER.just);
+  document.querySelectorAll('.sw').forEach(function(s){
+    s.classList.toggle('on', s.dataset.th === READER.theme);
+  });
+}
+function openArticle(i){
+  CUR.idx = i;
+  var a = CUR.ed.articles[i];
+  $('rdKick').textContent = a.kick || '';
+  $('rdKick').classList.toggle('hide', !a.kick);
+  $('rdHead').textContent = a.h;
+  $('rdBy').textContent = a.by || '';
+  $('rdBy').classList.toggle('hide', !a.by);
+  $('rdSrc').textContent = [a.sec, a.dl, a.src, 'page ' + a.page]
+    .filter(function(x){ return x && x !== 'General' && x !== 'Unknown'; }).join(' · ');
+  $('rdBody').innerHTML = a.body.split(/\n{2,}/).map(function(p){
+    return '<p>' + esc(p).replace(/\n/g,' ') + '</p>';
+  }).join('');
+  var pos = CUR.order.indexOf(i);
+  var prev = pos > 0 ? CUR.ed.articles[CUR.order[pos-1]] : null;
+  var next = pos > -1 && pos < CUR.order.length-1 ? CUR.ed.articles[CUR.order[pos+1]] : null;
+  $('btnPrev').disabled = !prev;
+  $('btnNext').disabled = !next;
+  $('prevTitle').textContent = prev ? prev.h : '—';
+  $('nextTitle').textContent = next ? next.h : 'End of edition';
+  if(!a.read){ a.read = true; dbPut(CUR.ed); }
+  applyReader();
+  show('reader');
+  $('reader').scrollTop = 0;
+}
+function step(d){
+  var pos = CUR.order.indexOf(CUR.idx) + d;
+  if(pos >= 0 && pos < CUR.order.length) openArticle(CUR.order[pos]);
+}
+
+/* ---------- settings modal ---------- */
+function openSettings(){
+  $('setKey').value = CFG.key;
+  $('setGKey').value = CFG.gkey;
+  $('setModel').value = CFG.model;
+  $('mSettings').classList.remove('hide');
+}
+$('btnSettings').onclick = openSettings;
+$('btnCloseSet').onclick = function(){ $('mSettings').classList.add('hide'); };
+$('btnSaveSet').onclick = function(){
+  CFG.key = $('setKey').value.trim();
+  CFG.gkey = $('setGKey').value.trim();
+  CFG.model = $('setModel').value;
+  localStorage.setItem('ak_key', CFG.key);
+  localStorage.setItem('ak_gkey', CFG.gkey);
+  localStorage.setItem('ak_model', CFG.model);
+  $('mSettings').classList.add('hide');
+  toast('Saved');
+};
+
+/* ---------- wiring ---------- */
+$('btnPick').onclick = function(){ $('filePdf').click(); };
+$('filePdf').onchange = function(e){
+  var f = e.target.files[0];
+  e.target.value = '';
+  if(f) processPdf(f);
+};
+$('btnCancel').onclick = function(){
+  RUN.cancel = true;
+  toast('Stopping after current pages…');
+};
+$('btnFinishEarly').onclick = function(){
+  RUN.cancel = true;
+  setTimeout(finishRun, 400);
+};
+$('btnIdxBack').onclick = function(){ paintLibrary(); show('vHome'); };
+$('idxSearch').oninput = function(e){ paintIndex(e.target.value); };
+$('btnRdBack').onclick = function(){
+  paintIndex($('idxSearch').value);
+  show('vIndex');
+};
+$('btnPrev').onclick = function(){ step(-1); };
+$('btnNext').onclick = function(){ step(1); };
+
+/* Aa panel */
+function openAa(open){
+  $('aaPanel').classList.toggle('open', open);
+  $('scrim').classList.toggle('hide', !open);
+}
+$('btnAa').onclick = function(){ openAa(true); };
+$('scrim').onclick = function(){ openAa(false); };
+$('ctlSize').oninput = function(e){ READER.size = +e.target.value; saveReader(); applyReader(); };
+$('ctlLh').oninput = function(e){ READER.lh = +e.target.value; saveReader(); applyReader(); };
+$('fSerif').onclick = function(){ READER.font='serif'; saveReader(); applyReader(); };
+$('fSans').onclick = function(){ READER.font='sans'; saveReader(); applyReader(); };
+$('fJust').onclick = function(){ READER.just=!READER.just; saveReader(); applyReader(); };
+document.querySelectorAll('.sw').forEach(function(s){
+  s.onclick = function(){ READER.theme = s.dataset.th; saveReader(); applyReader(); };
+});
+
+/* ---------- boot ---------- */
+$('todayLine').textContent = new Date().toLocaleDateString('en-IN',
+  {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+openDB().then(function(){
+  paintLibrary();
+  if(isGemini() ? !CFG.gkey : !CFG.key) setTimeout(openSettings, 600);
+});
+</script>
+</body>
+</html>
